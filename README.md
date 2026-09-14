@@ -1,0 +1,47 @@
+# WE Academic Monitor — GitHub + Cloudflare
+
+Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung chương trình và báo cáo đánh giá. Bản này đã được chuẩn bị để triển khai độc lập bằng **GitHub + Cloudflare Workers + D1**.
+
+## Chức năng chính
+
+- Quản lý lớp, học viên và giáo viên.
+- Khung chương trình Baby Stars, Super Kids 1–8, Starters, Movers và Flyers.
+- Phiếu đánh giá thay đổi theo chương trình của học viên.
+- Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
+- Đánh giá giáo viên.
+- Báo cáo tổng hợp, cảnh báo học viên cần theo dõi.
+
+## Yêu cầu
+
+- Tài khoản GitHub.
+- Tài khoản Cloudflare đã kích hoạt Workers.
+- Node.js 22.13 trở lên nếu chạy lệnh trên máy tính.
+- Tên Worker: `we-academic-monitor`.
+- Tên D1: `we-academic-monitor-db`.
+- Binding D1 bắt buộc giữ là `DB`.
+
+## Hướng dẫn nhanh
+
+Toàn bộ hướng dẫn từng bước nằm trong file [HUONG-DAN-SETUP.md](HUONG-DAN-SETUP.md).
+
+Các lệnh quan trọng:
+
+```bash
+npm install
+npx wrangler login
+npm run db:migrate:remote
+npm run build
+npm run deploy
+```
+
+## Lưu ý dữ liệu
+
+- GitHub chỉ chứa mã nguồn, không chứa danh sách học viên hoặc kết quả đánh giá.
+- Dữ liệu thật nằm trong Cloudflare D1.
+- D1 mới sẽ trống. Dữ liệu trên website ChatGPT Sites hiện tại không tự động chuyển sang D1 mới.
+- Không chỉnh sửa hoặc xóa các migration cũ trong thư mục `drizzle/` sau khi đã triển khai.
+- Trước mỗi thay đổi lớn, xuất bản sao D1 theo hướng dẫn trong `HUONG-DAN-SETUP.md`.
+
+## Bảo mật
+
+Địa chỉ `workers.dev` mặc định có thể truy cập công khai. Hãy cấu hình Cloudflare Access trước khi nhập dữ liệu học viên thật. Bản hiện tại chưa tách quyền Admin/Giáo viên; mọi người được Cloudflare Access cho phép vào website đều có cùng quyền thao tác.
