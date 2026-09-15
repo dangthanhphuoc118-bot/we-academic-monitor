@@ -13,6 +13,10 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
 - Đánh giá giáo viên.
 - Báo cáo học viên theo ba vùng Good, Average và Redflag kèm nhận xét/lý do.
+- Đăng nhập bằng email và mã PIN, có ba vai trò Admin, Academic Manager và Academic Leader.
+- Admin tự tạo, chỉnh sửa, phân quyền, đổi PIN hoặc khóa tài khoản trên website.
+- Academic Manager và Academic Leader có cùng quyền quản lý học vụ, kiểm tra học viên, đánh giá giáo viên và xem báo cáo.
+- Tên người thực hiện đánh giá được ghi nhận tự động từ tài khoản đăng nhập, không cần nhập thủ công.
 
 ## Yêu cầu
 
@@ -44,8 +48,9 @@ npm run deploy
 - D1 mới sẽ trống. Dữ liệu trên website ChatGPT Sites hiện tại không tự động chuyển sang D1 mới.
 - Không chỉnh sửa hoặc xóa các migration cũ trong thư mục `drizzle/` sau khi đã triển khai.
 - Migration `0002_grey_sentinels.sql` chỉ bổ sung cấu hình và nhận xét; không xóa dữ liệu học viên hiện có.
+- Migration `0003_dazzling_susan_delgado.sql` chỉ tạo các bảng đăng nhập; không sửa hoặc xóa dữ liệu học vụ hiện có.
 - Trước mỗi thay đổi lớn, xuất bản sao D1 theo hướng dẫn trong `HUONG-DAN-SETUP.md`.
 
 ## Bảo mật
 
-Địa chỉ `workers.dev` mặc định có thể truy cập công khai. Hãy cấu hình Cloudflare Access trước khi nhập dữ liệu học viên thật. Bản hiện tại chưa tách quyền Admin/Giáo viên; mọi người được Cloudflare Access cho phép vào website đều có cùng quyền thao tác.
+Website yêu cầu email và PIN trước khi tải dữ liệu. PIN được băm trước khi lưu, phiên đăng nhập dùng cookie bảo mật và tài khoản bị chặn tạm thời sau nhiều lần nhập sai. Cloudflare Access vẫn có thể được bật như một lớp bảo vệ bổ sung.

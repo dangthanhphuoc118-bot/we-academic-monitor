@@ -15,6 +15,11 @@ Phiên bản này cập nhật website theo bốn trang yêu cầu trong file PD
 - Xóa phần Kế hoạch theo dõi khỏi phiếu kiểm tra học viên.
 - Chuyển báo cáo học viên thành ba vùng Good, Average và Redflag.
 - Mỗi học viên trong báo cáo hiển thị lớp, trình độ, nội dung kiểm tra, ngày, giáo viên, điểm và nhận xét hoặc lý do.
+- Xóa ô nhập Giáo viên đánh giá khỏi phiếu kiểm tra; hệ thống tự ghi nhận tài khoản đang đăng nhập.
+- Thêm đăng nhập bằng email và PIN cho Admin, Academic Manager và Academic Leader.
+- Thêm trang Tài khoản để Admin tự tạo người dùng, phân quyền, đổi PIN và khóa/mở tài khoản.
+- Academic Manager và Academic Leader có cùng quyền học vụ: quản lý dữ liệu, kiểm tra học viên, đánh giá giáo viên và xem báo cáo.
+- PIN được băm bằng PBKDF2; phiên đăng nhập dùng cookie HttpOnly, Secure và SameSite; có giới hạn số lần nhập sai.
 
 ## Quy tắc chia vùng báo cáo
 
@@ -33,6 +38,14 @@ Migration mới là `drizzle/0002_grey_sentinels.sql`. Migration chỉ bổ sung
 - Cột `feedback_json` trong bảng `learning_checks`.
 
 Migration không xóa hoặc làm trống dữ liệu học viên, lớp, giáo viên và lịch sử đánh giá hiện có.
+
+Migration đăng nhập là `drizzle/0003_dazzling_susan_delgado.sql`. Migration này chỉ tạo:
+
+- Bảng `auth_users`.
+- Bảng `auth_sessions`.
+- Bảng `auth_login_attempts`.
+
+Migration `0003` không thay đổi các bảng học viên, lớp, giáo viên hoặc lịch sử đánh giá.
 
 ## Kiểm tra kỹ thuật đã thực hiện
 
