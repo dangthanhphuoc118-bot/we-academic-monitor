@@ -15,6 +15,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { curriculumDefaults, curriculumKey, programs } from "@/lib/curriculum";
+import { getCurrentUser } from "@/lib/auth";
 
 type ScoreItem = { criterionId: number; score: number; note?: string };
 
@@ -43,8 +44,10 @@ function messageFor(error: unknown) {
   return message;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) return fail("Vui lòng đăng nhập để tiếp tục.", 401);
     const db = getDb();
     const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows, levelRows, feedbackRows] =
       await Promise.all([
@@ -209,6 +212,9 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const action = text(body.action);
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) return fail("Phiên đăng nhập đã hết hạn.", 401);
+    const actorName = currentUser.name || currentUser.email;
     const db = getDb();
 
     if (action === "createLevelOption" || action === "updateLevelOption") {
@@ -330,7 +336,6 @@ export async function POST(request: Request) {
       const studentId = id(body.studentId);
       const programCode = text(body.programCode);
       const unitNumber = id(body.unitNumber);
-      const teacherName = text(body.teacherName);
       const checkedAt = text(body.checkedAt);
       const evaluation =
         body.evaluation && typeof body.evaluation === "object"
@@ -339,8 +344,8 @@ export async function POST(request: Request) {
       const feedback = Array.isArray(body.feedback)
         ? body.feedback.map(text).filter(Boolean).slice(0, 30)
         : [];
-      if (!studentId || !programCode || !unitNumber || !teacherName || !checkedAt) {
-        return fail("Vui lòng chọn học viên, nội dung kiểm tra, giáo viên và ngày đánh giá.");
+      if (!studentId || !programCode || !unitNumber || !checkedAt) {
+        return fail("Vui lòng chọn học viên, nội dung kiểm tra và ngày đánh giá.");
       }
 
       const program = programs.find((item) => item.code === programCode);
@@ -432,7 +437,7 @@ export async function POST(request: Request) {
           programLabel: student.level || program.label,
           unitNumber,
           unitLabel: defaultUnit.unitLabel,
-          teacherName,
+          teacherName: actorName,
           checkedAt,
           evaluationJson: JSON.stringify(evaluation),
           overallScore,
@@ -604,11 +609,10 @@ export async function POST(request: Request) {
 
     if (action === "createStudentAssessment") {
       const studentId = id(body.studentId);
-      const evaluatorName = text(body.evaluatorName);
       const checkedAt = text(body.checkedAt);
       const items = Array.isArray(body.items) ? (body.items as ScoreItem[]) : [];
-      if (!studentId || !evaluatorName || !checkedAt || !items.length) {
-        return fail("Vui lòng chọn học viên, người đánh giá, ngày kiểm tra và chấm đủ tiêu chí.");
+      if (!studentId || !checkedAt || !items.length) {
+        return fail("Vui lòng chọn học viên, ngày kiểm tra và chấm đủ tiêu chí.");
       }
       const criterionIds = items.map((item) => id(item.criterionId)).filter((value): value is number => Boolean(value));
       const criterionRows = await db.select({ id: criteria.id, weight: criteria.weight }).from(criteria).where(and(eq(criteria.targetType, "student"), inArray(criteria.id, criterionIds)));
@@ -623,7 +627,7 @@ export async function POST(request: Request) {
       const [assessment] = await db.insert(studentAssessments).values({
         studentId,
         classId: student.classId,
-        evaluatorName,
+        evaluatorName: actorName,
         overallScore,
         result,
         summary: text(body.summary),
@@ -648,11 +652,10 @@ export async function POST(request: Request) {
 
     if (action === "createTeacherReview") {
       const teacherId = id(body.teacherId);
-      const reviewerName = text(body.reviewerName);
       const observedAt = text(body.observedAt);
       const items = Array.isArray(body.items) ? (body.items as ScoreItem[]) : [];
-      if (!teacherId || !reviewerName || !observedAt || !items.length) {
-        return fail("Vui lòng chọn giáo viên, người đánh giá, ngày dự giờ và chấm đủ tiêu chí.");
+      if (!teacherId || !observedAt || !items.length) {
+        return fail("Vui lòng chọn giáo viên, ngày dự giờ và chấm đủ tiêu chí.");
       }
       const criterionIds = items.map((item) => id(item.criterionId)).filter((value): value is number => Boolean(value));
       const criterionRows = await db.select({ id: criteria.id, weight: criteria.weight }).from(criteria).where(and(eq(criteria.targetType, "teacher"), inArray(criteria.id, criterionIds)));
@@ -664,7 +667,7 @@ export async function POST(request: Request) {
       const result = overallScore >= 4 ? "Tốt" : overallScore >= 3 ? "Đạt" : overallScore >= 2 ? "Cần theo dõi" : "Cần hỗ trợ";
       const [review] = await db.insert(teacherReviews).values({
         teacherId,
-        reviewerName,
+        reviewerName: actorName,
         overallScore,
         result,
         summary: text(body.summary),

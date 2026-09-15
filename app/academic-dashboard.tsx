@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   LoaderCircle,
   ListChecks,
+  LogOut,
   Pencil,
   Plus,
   RefreshCw,
@@ -23,6 +24,7 @@ import {
   Sparkles,
   Trash2,
   UserCheck,
+  UserCog,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,8 +46,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { CurriculumManager, CurriculumStudentCheck, type FeedbackOption, type LevelOption } from "./curriculum-check";
 import { programs, type CurriculumUnit, type LearningCheck } from "@/lib/curriculum";
+import { AccountManager, LoginScreen, roleLabels, type CurrentUser } from "./auth-components";
 
-type View = "overview" | "student-check" | "students" | "classes" | "teachers" | "teacher-review" | "curriculum" | "feedback-options" | "criteria" | "reports";
+type View = "overview" | "student-check" | "students" | "classes" | "teachers" | "teacher-review" | "curriculum" | "feedback-options" | "criteria" | "reports" | "accounts";
 type EntityKind = "class" | "student" | "teacher" | "criterion" | "levelOption" | "feedbackOption";
 type DataRow = Record<string, string | number | null>;
 
@@ -71,8 +74,19 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard; section
   { id: "curriculum", label: "Khung chương trình", icon: BookOpen, section: "manage" },
   { id: "feedback-options", label: "Mẫu nhận xét", icon: ListChecks, section: "manage" },
   { id: "criteria", label: "Tiêu chí giáo viên", icon: Settings2, section: "manage" },
+  { id: "accounts", label: "Tài khoản", icon: UserCog, section: "manage" },
   { id: "reports", label: "Báo cáo", icon: BarChart3, section: "report" },
 ];
+
+function defaultView(user: CurrentUser): View {
+  if (user.role === "academic_leader" || user.role === "academic_manager") return "overview";
+  return "overview";
+}
+
+function navFor(user: CurrentUser) {
+  if (user.role === "admin") return navItems;
+  return navItems.filter((item) => item.id !== "accounts");
+}
 
 function formatDate(value: string) {
   if (!value) return "—";
@@ -139,6 +153,9 @@ async function postAction(action: string, payload: Record<string, unknown> = {})
 
 export function AcademicDashboard() {
   const [view, setView] = useState<View>("overview");
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [setupRequired, setSetupRequired] = useState(false);
   const [data, setData] = useState<AcademicData>(emptyData);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -153,6 +170,10 @@ export function AcademicDashboard() {
     try {
       const response = await fetch("/api/academic", { cache: "no-store" });
       const result = await response.json() as AcademicData & { error?: string };
+      if (response.status === 401) {
+        setUser(null);
+        setData(emptyData);
+      }
       if (!response.ok) throw new Error(result.error || "Không thể tải dữ liệu.");
       setData(result);
       setLoadError("");
@@ -163,13 +184,33 @@ export function AcademicDashboard() {
     }
   };
 
-  // Loading remote dashboard data after mount is the intended external synchronization here.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void reload(); }, []);
+  // Loading the session and remote dashboard data after mount is the intended synchronization here.
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const response = await fetch("/api/auth", { cache: "no-store" });
+        const result = await response.json() as { user?: CurrentUser | null; setupRequired?: boolean };
+        if (result.user) {
+          setUser(result.user);
+          setView(defaultView(result.user));
+          await reload();
+        } else {
+          setSetupRequired(Boolean(result.setupRequired));
+          setLoading(false);
+        }
+      } catch {
+        setSetupRequired(true);
+        setLoading(false);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    void loadSession();
+  }, []);
 
   useEffect(() => {
     const modelContext = (document as Document & { modelContext?: { registerTool: (tool: Record<string, unknown>, options?: { signal?: AbortSignal }) => void | Promise<void> } }).modelContext;
-    if (!modelContext?.registerTool) return;
+    if (!modelContext?.registerTool || !user) return;
     const lifecycle = new AbortController();
     const register = async () => {
       await modelContext.registerTool({
@@ -199,7 +240,7 @@ export function AcademicDashboard() {
     };
     void register().catch(() => undefined);
     return () => lifecycle.abort();
-  }, [data]);
+  }, [data, user]);
 
   const latestStudents = useMemo(() => latestStudentRows(data), [data]);
   const currentMonth = today().slice(0, 7);
@@ -235,10 +276,41 @@ export function AcademicDashboard() {
     setView("student-check");
   };
 
+  const authenticated = (nextUser: CurrentUser) => {
+    setUser(nextUser);
+    setSetupRequired(false);
+    setView(defaultView(nextUser));
+    void reload();
+  };
+
+  const logout = async () => {
+    try {
+      await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      });
+    } finally {
+      setUser(null);
+      setData(emptyData);
+      setLoading(false);
+    }
+  };
+
+  if (authLoading) {
+    return <main className="academic-grid grid min-h-screen place-items-center bg-[#f3f6f8]"><div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><LoaderCircle className="animate-spin" /> Đang kiểm tra đăng nhập...</div></main>;
+  }
+
+  if (!user) {
+    return <><LoginScreen setupRequired={setupRequired} onAuthenticated={authenticated} /><Toaster richColors position="top-right" /></>;
+  }
+
+  const visibleNavItems = navFor(user);
+
   const content = loading ? <LoadingView /> : loadError ? <LoadError message={loadError} retry={() => void reload()} /> : (
     <>
       {view === "overview" && <OverviewView data={data} atRisk={studentsAtRisk} unassessed={unassessed} checkedThisMonth={checkedThisMonth} latestTeacherMap={latestTeacherMap} setView={setView} onStudentCheck={goToStudentCheck} />}
-      {view === "student-check" && <CurriculumStudentCheck key={`${selectedClassId}-${selectedStudentId}`} classes={data.classes} students={data.students} curriculum={data.curriculum} levelOptions={data.levelOptions} feedbackOptions={data.feedbackOptions} selectedClassId={selectedClassId} setSelectedClassId={setSelectedClassId} selectedStudentId={selectedStudentId} setSelectedStudentId={setSelectedStudentId} onSaved={() => reload(true)} openCurriculum={() => setView("curriculum")} openFeedbackOptions={() => setView("feedback-options")} />}
+      {view === "student-check" && <CurriculumStudentCheck key={`${selectedClassId}-${selectedStudentId}`} classes={data.classes} students={data.students} curriculum={data.curriculum} levelOptions={data.levelOptions} feedbackOptions={data.feedbackOptions} selectedClassId={selectedClassId} setSelectedClassId={setSelectedClassId} selectedStudentId={selectedStudentId} setSelectedStudentId={setSelectedStudentId} onSaved={() => reload(true)} openCurriculum={() => setView("curriculum")} openFeedbackOptions={() => setView("feedback-options")} canManage />}
       {view === "students" && <StudentsView data={data} onAdd={() => setEditor({ kind: "student" })} onEdit={(item) => setEditor({ kind: "student", item: item as unknown as DataRow })} onDelete={(item) => setDeleting({ action: "deleteStudent", id: item.id, name: item.name })} onCheck={goToStudentCheck} />}
       {view === "classes" && <ClassesView data={data} onAdd={() => setEditor({ kind: "class" })} onEdit={(item) => setEditor({ kind: "class", item: item as unknown as DataRow })} onDelete={(item) => setDeleting({ action: "deleteClass", id: item.id, name: item.name })} />}
       {view === "teachers" && <TeachersView data={data} latestTeacherMap={latestTeacherMap} onAdd={() => setEditor({ kind: "teacher" })} onEdit={(item) => setEditor({ kind: "teacher", item: item as unknown as DataRow })} onDelete={(item) => setDeleting({ action: "deleteTeacher", id: item.id, name: item.name })} onReview={(item) => { setSelectedTeacherId(String(item.id)); setView("teacher-review"); }} />}
@@ -247,6 +319,7 @@ export function AcademicDashboard() {
       {view === "feedback-options" && <FeedbackOptionsView data={data} onAdd={() => setEditor({ kind: "feedbackOption" })} onEdit={(item) => setEditor({ kind: "feedbackOption", item: item as unknown as DataRow })} onDelete={(item) => setDeleting({ action: "deleteFeedbackOption", id: item.id, name: item.label })} />}
       {view === "criteria" && <CriteriaView data={data} onAdd={() => setEditor({ kind: "criterion" })} onEdit={(item) => setEditor({ kind: "criterion", item: item as unknown as DataRow })} onDelete={(item) => setDeleting({ action: "deleteCriterion", id: item.id, name: item.title })} onSeed={async () => { try { await postAction("seedDefaultCriteria"); await reload(true); toast.success("Đã tạo bộ tiêu chí gợi ý."); } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể tạo bộ tiêu chí."); } }} />}
       {view === "reports" && <ReportsView data={data} onDeleteAssessment={(item) => setDeleting({ action: "deleteStudentAssessment", id: item.id, name: `đánh giá của ${item.studentName}` })} onDeleteLearningCheck={(item) => setDeleting({ action: "deleteLearningCheck", id: item.id, name: `đánh giá của ${item.studentName}` })} onDeleteReview={(item) => setDeleting({ action: "deleteTeacherReview", id: item.id, name: `đánh giá của ${item.teacherName}` })} />}
+      {view === "accounts" && user.role === "admin" && <AccountManager />}
     </>
   );
 
@@ -260,18 +333,18 @@ export function AcademicDashboard() {
           </div>
         </SidebarHeader>
         <SidebarContent className="px-2">
-          <NavGroup label="Điều hành" items={navItems.filter((item) => item.section === "main")} current={view} onSelect={setView} />
-          <NavGroup label="Quản lý dữ liệu" items={navItems.filter((item) => item.section === "manage")} current={view} onSelect={setView} />
-          <NavGroup label="Tổng hợp" items={navItems.filter((item) => item.section === "report")} current={view} onSelect={setView} />
+          <NavGroup label="Điều hành" items={visibleNavItems.filter((item) => item.section === "main")} current={view} onSelect={setView} />
+          <NavGroup label="Quản lý dữ liệu" items={visibleNavItems.filter((item) => item.section === "manage")} current={view} onSelect={setView} />
+          <NavGroup label="Tổng hợp" items={visibleNavItems.filter((item) => item.section === "report")} current={view} onSelect={setView} />
         </SidebarContent>
         <SidebarFooter className="p-4">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3"><p className="text-xs font-semibold text-white">Academic Manager</p><p className="mt-1 text-xs leading-5 text-slate-400">Theo dõi dữ liệu tập trung, cập nhật trực tiếp.</p></div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3"><p className="truncate text-xs font-semibold text-white">{user.name}</p><p className="mt-1 truncate text-[11px] text-slate-400">{user.email}</p><p className="mt-1 text-xs font-semibold text-[#6fd4df]">{roleLabels[user.role]}</p></div>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset className="academic-grid min-w-0 bg-[#f3f6f8]">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b bg-white/90 px-4 backdrop-blur-md sm:px-7">
           <div className="flex items-center"><SidebarTrigger className="md:hidden" /></div>
-          <Button variant="outline" size="sm" onClick={() => void reload()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} /> Làm mới</Button>
+          <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => void reload()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} /> Làm mới</Button><Button variant="ghost" size="sm" onClick={() => void logout()}><LogOut /> Đăng xuất</Button></div>
         </header>
         <main className="mx-auto w-full max-w-[1480px] p-4 sm:p-7 lg:p-9">{content}</main>
       </SidebarInset>
@@ -362,18 +435,18 @@ function StudentCheckView({ data, selectedClassId, setSelectedClassId, selectedS
   const classInfo = data.classes.find((item) => String(item.id) === selectedClassId);
   const rows = data.criteria.filter((item) => item.targetType === "student" && item.active && student && (item.level === "ALL" || item.level === student.level));
   const [scores, setScores] = useState<Record<number, string>>({});
-  const [evaluatorName, setEvaluatorName] = useState(""); const [checkedAt, setCheckedAt] = useState(today()); const [summary, setSummary] = useState(""); const [actionPlan, setActionPlan] = useState(""); const [saving, setSaving] = useState(false);
+  const [checkedAt, setCheckedAt] = useState(today()); const [summary, setSummary] = useState(""); const [actionPlan, setActionPlan] = useState(""); const [saving, setSaving] = useState(false);
   const score = rows.length ? rows.reduce((sum, item) => sum + Number(scores[item.id] || 3) * item.weight, 0) / rows.reduce((sum, item) => sum + item.weight, 0) : 0;
-  const save = async () => { if (!student || !rows.length) return; setSaving(true); try { await postAction("createStudentAssessment", { studentId: student.id, evaluatorName, checkedAt, summary, actionPlan, items: rows.map((item) => ({ criterionId: item.id, score: Number(scores[item.id] || 3) })) }); await onSaved(); setSummary(""); setActionPlan(""); toast.success("Đã lưu kết quả kiểm tra học viên."); } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể lưu đánh giá."); } finally { setSaving(false); } };
-  return <div className="space-y-6"><SectionHeader eyebrow="Academic Leader" title="Kiểm tra tình hình học viên" description="Chọn lớp, chọn học viên, sau đó chấm bộ tiêu chí đúng với trình độ hiện tại." /><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardContent className="grid gap-4 p-5 md:grid-cols-2"><div><Label className="mb-2">1. Chọn lớp</Label><FormSelect value={selectedClassId} onChange={(value) => { setSelectedClassId(value); setSelectedStudentId(""); }} placeholder="Chọn lớp cần kiểm tra" options={data.classes.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.level}` }))} /></div><div><Label className="mb-2">2. Chọn học viên</Label><FormSelect value={selectedStudentId} onChange={setSelectedStudentId} placeholder="Chọn học viên" disabled={!selectedClassId} options={students.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.level}` }))} /></div></CardContent></Card>{student ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]"><div className="space-y-4"><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-xl">{student.name}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{classInfo?.name} · {student.level} · {classInfo?.schedule || "Chưa cập nhật lịch"}</p></div><Badge className="bg-[#ff7a3d]">Điểm dự kiến {score.toFixed(1)}/5</Badge></div></CardHeader><CardContent>{rows.length ? <div className="space-y-3">{rows.map((criterion, index) => <ScoreRow key={criterion.id} index={index + 1} criterion={criterion} value={scores[criterion.id] || "3"} onChange={(value) => setScores((current) => ({ ...current, [criterion.id]: value }))} />)}</div> : <EmptyPanel icon={Settings2} title="Chưa có tiêu chí phù hợp" description={`Hãy tạo tiêu chí chung hoặc tiêu chí cho trình độ ${student.level}.`} action={<Button onClick={() => setView("criteria")}><Settings2 /> Mở bộ tiêu chí</Button>} />}</CardContent></Card></div><Card className="h-fit border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><CardTitle className="text-lg">Kết luận & hành động</CardTitle></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="student-evaluator">Người đánh giá</Label><Input id="student-evaluator" value={evaluatorName} onChange={(e) => setEvaluatorName(e.target.value)} placeholder="VD: Academic Leader" /></div><div><Label htmlFor="student-date">Ngày kiểm tra</Label><Input id="student-date" type="date" value={checkedAt} onChange={(e) => setCheckedAt(e.target.value)} /></div><div><Label htmlFor="student-summary">Nhận xét tổng quan</Label><Textarea id="student-summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Điểm mạnh, vấn đề cần lưu ý..." rows={4} /></div><div><Label htmlFor="student-action">Kế hoạch hỗ trợ</Label><Textarea id="student-action" value={actionPlan} onChange={(e) => setActionPlan(e.target.value)} placeholder="Việc cần làm, người phụ trách, thời hạn..." rows={4} /></div><Button className="w-full bg-[#ff7a3d] hover:bg-[#e9652f]" onClick={save} disabled={saving || !evaluatorName || !rows.length}>{saving ? <LoaderCircle className="animate-spin" /> : <CheckCircle2 />} Lưu kết quả kiểm tra</Button></CardContent></Card></div> : <EmptyPanel icon={ClipboardCheck} title="Chọn lớp và học viên" description="Thông tin lớp, trình độ và bộ tiêu chí tương ứng sẽ tự động hiển thị." />}</div>;
+  const save = async () => { if (!student || !rows.length) return; setSaving(true); try { await postAction("createStudentAssessment", { studentId: student.id, checkedAt, summary, actionPlan, items: rows.map((item) => ({ criterionId: item.id, score: Number(scores[item.id] || 3) })) }); await onSaved(); setSummary(""); setActionPlan(""); toast.success("Đã lưu kết quả kiểm tra học viên."); } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể lưu đánh giá."); } finally { setSaving(false); } };
+  return <div className="space-y-6"><SectionHeader eyebrow="Academic Leader" title="Kiểm tra tình hình học viên" description="Chọn lớp, chọn học viên, sau đó chấm bộ tiêu chí đúng với trình độ hiện tại." /><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardContent className="grid gap-4 p-5 md:grid-cols-2"><div><Label className="mb-2">1. Chọn lớp</Label><FormSelect value={selectedClassId} onChange={(value) => { setSelectedClassId(value); setSelectedStudentId(""); }} placeholder="Chọn lớp cần kiểm tra" options={data.classes.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.level}` }))} /></div><div><Label className="mb-2">2. Chọn học viên</Label><FormSelect value={selectedStudentId} onChange={setSelectedStudentId} placeholder="Chọn học viên" disabled={!selectedClassId} options={students.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.level}` }))} /></div></CardContent></Card>{student ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]"><div className="space-y-4"><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-xl">{student.name}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{classInfo?.name} · {student.level} · {classInfo?.schedule || "Chưa cập nhật lịch"}</p></div><Badge className="bg-[#ff7a3d]">Điểm dự kiến {score.toFixed(1)}/5</Badge></div></CardHeader><CardContent>{rows.length ? <div className="space-y-3">{rows.map((criterion, index) => <ScoreRow key={criterion.id} index={index + 1} criterion={criterion} value={scores[criterion.id] || "3"} onChange={(value) => setScores((current) => ({ ...current, [criterion.id]: value }))} />)}</div> : <EmptyPanel icon={Settings2} title="Chưa có tiêu chí phù hợp" description={`Hãy tạo tiêu chí chung hoặc tiêu chí cho trình độ ${student.level}.`} action={<Button onClick={() => setView("criteria")}><Settings2 /> Mở bộ tiêu chí</Button>} />}</CardContent></Card></div><Card className="h-fit border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><CardTitle className="text-lg">Kết luận & hành động</CardTitle></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="student-date">Ngày kiểm tra</Label><Input id="student-date" type="date" value={checkedAt} onChange={(e) => setCheckedAt(e.target.value)} /></div><div><Label htmlFor="student-summary">Nhận xét tổng quan</Label><Textarea id="student-summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Điểm mạnh, vấn đề cần lưu ý..." rows={4} /></div><div><Label htmlFor="student-action">Kế hoạch hỗ trợ</Label><Textarea id="student-action" value={actionPlan} onChange={(e) => setActionPlan(e.target.value)} placeholder="Việc cần làm, người phụ trách, thời hạn..." rows={4} /></div><Button className="w-full bg-[#ff7a3d] hover:bg-[#e9652f]" onClick={save} disabled={saving || !rows.length}>{saving ? <LoaderCircle className="animate-spin" /> : <CheckCircle2 />} Lưu kết quả kiểm tra</Button></CardContent></Card></div> : <EmptyPanel icon={ClipboardCheck} title="Chọn lớp và học viên" description="Thông tin lớp, trình độ và bộ tiêu chí tương ứng sẽ tự động hiển thị." />}</div>;
 }
 
 function TeacherReviewView({ data, selectedTeacherId, setSelectedTeacherId, onSaved, setView }: { data: AcademicData; selectedTeacherId: string; setSelectedTeacherId: (value: string) => void; onSaved: () => Promise<void> | void; setView: (view: View) => void }) {
   const teacher = data.teachers.find((item) => String(item.id) === selectedTeacherId); const rows = data.criteria.filter((item) => item.targetType === "teacher" && item.active);
-  const [scores, setScores] = useState<Record<number, string>>({}); const [reviewerName, setReviewerName] = useState(""); const [observedAt, setObservedAt] = useState(today()); const [summary, setSummary] = useState(""); const [actionPlan, setActionPlan] = useState(""); const [saving, setSaving] = useState(false);
+  const [scores, setScores] = useState<Record<number, string>>({}); const [observedAt, setObservedAt] = useState(today()); const [summary, setSummary] = useState(""); const [actionPlan, setActionPlan] = useState(""); const [saving, setSaving] = useState(false);
   const score = rows.length ? rows.reduce((sum, item) => sum + Number(scores[item.id] || 3) * item.weight, 0) / rows.reduce((sum, item) => sum + item.weight, 0) : 0;
-  const save = async () => { if (!teacher || !rows.length) return; setSaving(true); try { await postAction("createTeacherReview", { teacherId: teacher.id, reviewerName, observedAt, summary, actionPlan, items: rows.map((item) => ({ criterionId: item.id, score: Number(scores[item.id] || 3) })) }); await onSaved(); setSummary(""); setActionPlan(""); toast.success("Đã lưu kết quả đánh giá giáo viên."); } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể lưu đánh giá."); } finally { setSaving(false); } };
-  return <div className="space-y-6"><SectionHeader eyebrow="Academic Manager" title="Dự giờ & đánh giá giáo viên" description="Ghi nhận chất lượng giảng dạy, vấn đề cần hỗ trợ và kế hoạch cải thiện." /><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardContent className="p-5"><Label className="mb-2">Chọn giáo viên</Label><FormSelect value={selectedTeacherId} onChange={setSelectedTeacherId} placeholder="Chọn giáo viên cần đánh giá" options={data.teachers.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.classCount} lớp` }))} /></CardContent></Card>{teacher ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]"><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-xl">{teacher.name}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{teacher.specialization || "Chưa cập nhật chuyên môn"} · {teacher.classCount} lớp phụ trách</p></div><Badge className="bg-[#0b5c75]">Điểm dự kiến {score.toFixed(1)}/5</Badge></div></CardHeader><CardContent>{rows.length ? <div className="space-y-3">{rows.map((criterion, index) => <ScoreRow key={criterion.id} index={index + 1} criterion={criterion} value={scores[criterion.id] || "3"} onChange={(value) => setScores((current) => ({ ...current, [criterion.id]: value }))} />)}</div> : <EmptyPanel icon={Settings2} title="Chưa có tiêu chí giáo viên" description="Tạo tiêu chí dành cho giáo viên trước khi đánh giá." action={<Button onClick={() => setView("criteria")}><Settings2 /> Mở bộ tiêu chí</Button>} />}</CardContent></Card><Card className="h-fit border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><CardTitle className="text-lg">Kết luận sau dự giờ</CardTitle></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="teacher-reviewer">Người đánh giá</Label><Input id="teacher-reviewer" value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} placeholder="VD: Academic Manager" /></div><div><Label htmlFor="teacher-date">Ngày dự giờ</Label><Input id="teacher-date" type="date" value={observedAt} onChange={(e) => setObservedAt(e.target.value)} /></div><div><Label htmlFor="teacher-summary">Nhận xét tổng quan</Label><Textarea id="teacher-summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Điểm tốt và vấn đề cần lưu ý..." rows={4} /></div><div><Label htmlFor="teacher-action">Kế hoạch hỗ trợ</Label><Textarea id="teacher-action" value={actionPlan} onChange={(e) => setActionPlan(e.target.value)} placeholder="Hỗ trợ chuyên môn, theo dõi lại..." rows={4} /></div><Button className="w-full" onClick={save} disabled={saving || !reviewerName || !rows.length}>{saving ? <LoaderCircle className="animate-spin" /> : <CheckCircle2 />} Lưu kết quả đánh giá</Button></CardContent></Card></div> : <EmptyPanel icon={UserCheck} title="Chọn giáo viên cần đánh giá" description="Bộ tiêu chí dành cho giáo viên sẽ được hiển thị tự động." />}</div>;
+  const save = async () => { if (!teacher || !rows.length) return; setSaving(true); try { await postAction("createTeacherReview", { teacherId: teacher.id, observedAt, summary, actionPlan, items: rows.map((item) => ({ criterionId: item.id, score: Number(scores[item.id] || 3) })) }); await onSaved(); setSummary(""); setActionPlan(""); toast.success("Đã lưu kết quả đánh giá giáo viên."); } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể lưu đánh giá."); } finally { setSaving(false); } };
+  return <div className="space-y-6"><SectionHeader eyebrow="Academic Manager" title="Dự giờ & đánh giá giáo viên" description="Ghi nhận chất lượng giảng dạy, vấn đề cần hỗ trợ và kế hoạch cải thiện." /><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardContent className="p-5"><Label className="mb-2">Chọn giáo viên</Label><FormSelect value={selectedTeacherId} onChange={setSelectedTeacherId} placeholder="Chọn giáo viên cần đánh giá" options={data.teachers.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.classCount} lớp` }))} /></CardContent></Card>{teacher ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]"><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-xl">{teacher.name}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{teacher.specialization || "Chưa cập nhật chuyên môn"} · {teacher.classCount} lớp phụ trách</p></div><Badge className="bg-[#0b5c75]">Điểm dự kiến {score.toFixed(1)}/5</Badge></div></CardHeader><CardContent>{rows.length ? <div className="space-y-3">{rows.map((criterion, index) => <ScoreRow key={criterion.id} index={index + 1} criterion={criterion} value={scores[criterion.id] || "3"} onChange={(value) => setScores((current) => ({ ...current, [criterion.id]: value }))} />)}</div> : <EmptyPanel icon={Settings2} title="Chưa có tiêu chí giáo viên" description="Tạo tiêu chí dành cho giáo viên trước khi đánh giá." action={<Button onClick={() => setView("criteria")}><Settings2 /> Mở bộ tiêu chí</Button>} />}</CardContent></Card><Card className="h-fit border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><CardTitle className="text-lg">Kết luận sau dự giờ</CardTitle></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="teacher-date">Ngày dự giờ</Label><Input id="teacher-date" type="date" value={observedAt} onChange={(e) => setObservedAt(e.target.value)} /></div><div><Label htmlFor="teacher-summary">Nhận xét tổng quan</Label><Textarea id="teacher-summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Điểm tốt và vấn đề cần lưu ý..." rows={4} /></div><div><Label htmlFor="teacher-action">Kế hoạch hỗ trợ</Label><Textarea id="teacher-action" value={actionPlan} onChange={(e) => setActionPlan(e.target.value)} placeholder="Hỗ trợ chuyên môn, theo dõi lại..." rows={4} /></div><Button className="w-full" onClick={save} disabled={saving || !rows.length}>{saving ? <LoaderCircle className="animate-spin" /> : <CheckCircle2 />} Lưu kết quả đánh giá</Button></CardContent></Card></div> : <EmptyPanel icon={UserCheck} title="Chọn giáo viên cần đánh giá" description="Bộ tiêu chí dành cho giáo viên sẽ được hiển thị tự động." />}</div>;
 }
 
 function ScoreRow({ index, criterion, value, onChange }: { index: number; criterion: CriterionRow; value: string; onChange: (value: string) => void }) {

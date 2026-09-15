@@ -270,3 +270,55 @@ export const learningChecks = sqliteTable(
     index("idx_learning_checks_result").on(table.result),
   ]
 );
+
+export const authUsers = sqliteTable(
+  "auth_users",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    pinHash: text("pin_hash").notNull(),
+    pinSalt: text("pin_salt").notNull(),
+    role: text("role").notNull(),
+    active: integer("active").notNull().default(1),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_auth_users_email_unique").on(table.email),
+    index("idx_auth_users_role_active").on(table.role, table.active),
+  ]
+);
+
+export const authSessions = sqliteTable(
+  "auth_sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_auth_sessions_user_id").on(table.userId),
+    index("idx_auth_sessions_expires_at").on(table.expiresAt),
+  ]
+);
+
+export const authLoginAttempts = sqliteTable(
+  "auth_login_attempts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    email: text("email").notNull(),
+    ipAddress: text("ip_address").notNull(),
+    attemptedAt: text("attempted_at").notNull(),
+  },
+  (table) => [
+    index("idx_auth_login_attempts_lookup").on(
+      table.email,
+      table.ipAddress,
+      table.attemptedAt
+    ),
+  ]
+);
