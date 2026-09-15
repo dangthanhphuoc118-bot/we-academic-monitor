@@ -4,7 +4,6 @@
   "main": "dist/server/index.js",
   "compatibility_date": "2026-09-14",
   "compatibility_flags": ["nodejs_compat"],
-  "no_bundle": true,
   "assets": {
     "directory": "dist/client"
   },
@@ -12,17 +11,11 @@
     {
       "binding": "DB",
       "database_name": "we-academic-monitor-db",
-      "database_id": "f68ebb13-2e0d-452d-a365-5056edfa8666",
+      "database_id": "00000000-0000-4000-8000-000000000000",
       "migrations_dir": "drizzle"
     }
   ],
   "observability": {
     "enabled": true
-  },
-  "rules": [
-    {
-      "type": "ESModule",
-      "globs": ["**/*.js", "**/*.mjs"]
-    }
-  ]
+  }
 }

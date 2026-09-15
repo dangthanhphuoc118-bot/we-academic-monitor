@@ -6,10 +6,13 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 - Quản lý lớp, học viên và giáo viên.
 - Khung chương trình Baby Stars, Super Kids 1–8, Starters, Movers và Flyers.
+- Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
+- Hiển thị riêng Vocabulary và Grammar / Communication trong khung chương trình.
+- Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
 - Đánh giá giáo viên.
-- Báo cáo tổng hợp, cảnh báo học viên cần theo dõi.
+- Báo cáo học viên theo ba vùng Good, Average và Redflag kèm nhận xét/lý do.
 
 ## Yêu cầu
 
@@ -40,6 +43,7 @@ npm run deploy
 - Dữ liệu thật nằm trong Cloudflare D1.
 - D1 mới sẽ trống. Dữ liệu trên website ChatGPT Sites hiện tại không tự động chuyển sang D1 mới.
 - Không chỉnh sửa hoặc xóa các migration cũ trong thư mục `drizzle/` sau khi đã triển khai.
+- Migration `0002_grey_sentinels.sql` chỉ bổ sung cấu hình và nhận xét; không xóa dữ liệu học viên hiện có.
 - Trước mỗi thay đổi lớn, xuất bản sao D1 theo hướng dẫn trong `HUONG-DAN-SETUP.md`.
 
 ## Bảo mật

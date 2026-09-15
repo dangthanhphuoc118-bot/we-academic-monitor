@@ -15,6 +15,13 @@
       "when": 1789381812614,
       "tag": "0001_wide_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789461773451,
+      "tag": "0002_grey_sentinels",
+      "breakpoints": true
     }
   ]
 }

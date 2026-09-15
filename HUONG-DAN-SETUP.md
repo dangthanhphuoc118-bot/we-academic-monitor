@@ -82,6 +82,8 @@ Kết quả phải có các bảng chính:
 - `teacher_review_items`
 - `curriculum_overrides`
 - `learning_checks`
+- `level_options`
+- `student_feedback_options`
 
 D1 có thể hiển thị thêm bảng quản lý migration; đây là bình thường.
 
@@ -141,6 +143,32 @@ Website `workers.dev` có thể công khai nếu chưa có lớp bảo vệ. Kh�
 Cloudflare Access chỉ kiểm soát ai được vào. Phiên bản hiện tại chưa phân quyền riêng Admin và Giáo viên ở bên trong ứng dụng.
 
 ## 7. Cập nhật website về sau
+
+### Cập nhật phiên bản chỉnh sửa theo file PDF ngày 15/09/2026
+
+1. Sao lưu D1 trước khi cập nhật:
+
+```bash
+npx wrangler d1 export we-academic-monitor-db --remote --output=backup-before-update.sql
+```
+
+2. Giải nén bộ source mới và chép các file vào repository GitHub hiện tại.
+3. Giữ nguyên **Database ID đang hoạt động** trong `wrangler.jsonc`. Nếu file mới đang có chuỗi số 0, thay lại bằng Database ID của D1 hiện tại trước khi commit.
+4. Commit lên nhánh `main`.
+5. Trong Cloudflare, dùng đúng:
+
+```text
+Build command: npm run build
+Deploy command: npm run deploy
+```
+
+Không nhập `npm wrangler deploy`; đây không phải cú pháp npm hợp lệ.
+
+Lệnh `npm run deploy` sẽ tự chạy migration `0002_grey_sentinels.sql`. Migration này chỉ thêm bảng cấu hình chương trình, bảng mẫu nhận xét và cột lưu lựa chọn; không xóa danh sách học viên, lớp, giáo viên hay lịch sử hiện có.
+
+6. Sau khi deploy, kiểm tra lần lượt: **Khung chương trình → Mẫu nhận xét → Kiểm tra học viên → Báo cáo**.
+
+### Quy trình cập nhật thông thường
 
 Mỗi khi sửa code:
 

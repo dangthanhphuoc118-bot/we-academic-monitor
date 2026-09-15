@@ -42,6 +42,7 @@ export type LearningCheck = {
   evaluationJson: string;
   overallScore: number;
   result: string;
+  feedbackJson: string;
   notes: string;
   actionPlan: string;
 };

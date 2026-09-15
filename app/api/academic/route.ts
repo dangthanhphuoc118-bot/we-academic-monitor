@@ -4,10 +4,12 @@ import {
   classes,
   criteria,
   curriculumOverrides,
+  levelOptions,
   learningChecks,
   studentAssessmentItems,
   studentAssessments,
   students,
+  studentFeedbackOptions,
   teacherReviewItems,
   teacherReviews,
   teachers,
@@ -33,7 +35,7 @@ function messageFor(error: unknown) {
     return "Dữ liệu chưa được khởi tạo. Vui lòng xuất bản lại phiên bản có cơ sở dữ liệu.";
   }
   if (message.includes("UNIQUE constraint failed")) {
-    return "Tên lớp đã tồn tại. Vui lòng chọn tên khác.";
+    return "Tên hoặc nội dung này đã tồn tại. Vui lòng nhập giá trị khác.";
   }
   if (message.includes("FOREIGN KEY constraint failed")) {
     return "Không thể thực hiện vì dữ liệu đang được sử dụng ở nơi khác.";
@@ -44,7 +46,7 @@ function messageFor(error: unknown) {
 export async function GET() {
   try {
     const db = getDb();
-    const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows] =
+    const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows, levelRows, feedbackRows] =
       await Promise.all([
         db
           .select({
@@ -145,6 +147,7 @@ export async function GET() {
             evaluationJson: learningChecks.evaluationJson,
             overallScore: learningChecks.overallScore,
             result: learningChecks.result,
+            feedbackJson: learningChecks.feedbackJson,
             notes: learningChecks.notes,
             actionPlan: learningChecks.actionPlan,
           })
@@ -153,14 +156,21 @@ export async function GET() {
           .leftJoin(classes, eq(learningChecks.classId, classes.id))
           .orderBy(desc(learningChecks.checkedAt), desc(learningChecks.id))
           .limit(300),
+        db.select().from(levelOptions).orderBy(asc(levelOptions.sortOrder), asc(levelOptions.id)),
+        db.select().from(studentFeedbackOptions).orderBy(asc(studentFeedbackOptions.sortOrder), asc(studentFeedbackOptions.id)),
       ]);
 
     const overrides = new Map(
       overrideRows.map((row) => [curriculumKey(row.programCode, row.unitNumber), row])
     );
+    const programLabels = new Map(
+      levelRows
+        .filter((row) => row.programCode)
+        .map((row) => [row.programCode, row.label])
+    );
     const curriculum = curriculumDefaults.map((unit) => {
       const override = overrides.get(curriculumKey(unit.programCode, unit.unitNumber));
-      return override
+      const merged = override
         ? {
             ...unit,
             topic: override.topic,
@@ -172,6 +182,10 @@ export async function GET() {
             isOverride: true,
           }
         : unit;
+      return {
+        ...merged,
+        programLabel: programLabels.get(unit.programCode) || merged.programLabel,
+      };
     });
 
     return Response.json({
@@ -183,6 +197,8 @@ export async function GET() {
       teacherReviews: reviewRows,
       curriculum,
       learningChecks: learningCheckRows,
+      levelOptions: levelRows,
+      feedbackOptions: feedbackRows,
     });
   } catch (error) {
     return fail(messageFor(error), 500);
@@ -194,6 +210,77 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const action = text(body.action);
     const db = getDb();
+
+    if (action === "createLevelOption" || action === "updateLevelOption") {
+      const label = text(body.label);
+      const programCode = text(body.programCode);
+      if (!label) return fail("Vui lòng nhập tên chương trình hoặc trình độ.");
+      if (programCode && !programs.some((item) => item.code === programCode)) {
+        return fail("Khung chương trình liên kết không hợp lệ.");
+      }
+      const values = {
+        label,
+        programCode,
+        active: body.active === false || body.active === 0 ? 0 : 1,
+        sortOrder: Number(body.sortOrder) || 0,
+        updatedAt: now(),
+      };
+      if (action === "createLevelOption") {
+        const [row] = await db.insert(levelOptions).values(values).returning();
+        return Response.json({ item: row }, { status: 201 });
+      }
+      const itemId = id(body.id);
+      if (!itemId) return fail("Chương trình hoặc trình độ không hợp lệ.");
+      const [current] = await db.select().from(levelOptions).where(eq(levelOptions.id, itemId)).limit(1);
+      if (!current) return fail("Không tìm thấy chương trình hoặc trình độ.", 404);
+      const [row] = await db.update(levelOptions).set(values).where(eq(levelOptions.id, itemId)).returning();
+      if (current.label !== label) {
+        await db.update(classes).set({ level: label, updatedAt: now() }).where(eq(classes.level, current.label));
+        await db.update(students).set({ level: label, updatedAt: now() }).where(eq(students.level, current.label));
+      }
+      return Response.json({ item: row });
+    }
+
+    if (action === "deleteLevelOption") {
+      const itemId = id(body.id);
+      if (!itemId) return fail("Chương trình hoặc trình độ không hợp lệ.");
+      const [current] = await db.select().from(levelOptions).where(eq(levelOptions.id, itemId)).limit(1);
+      if (!current) return fail("Không tìm thấy chương trình hoặc trình độ.", 404);
+      const [classUse] = await db.select({ total: count() }).from(classes).where(eq(classes.level, current.label));
+      const [studentUse] = await db.select({ total: count() }).from(students).where(eq(students.level, current.label));
+      if (Number(classUse.total) + Number(studentUse.total) > 0) {
+        return fail("Trình độ đang được sử dụng. Hãy chuyển sang trạng thái tạm ẩn thay vì xóa.", 409);
+      }
+      await db.delete(levelOptions).where(eq(levelOptions.id, itemId));
+      return Response.json({ ok: true });
+    }
+
+    if (action === "createFeedbackOption" || action === "updateFeedbackOption") {
+      const label = text(body.label);
+      if (!label) return fail("Vui lòng nhập nội dung nhận xét.");
+      const values = {
+        category: text(body.category) || "Nhận xét chung",
+        label,
+        active: body.active === false || body.active === 0 ? 0 : 1,
+        sortOrder: Number(body.sortOrder) || 0,
+        updatedAt: now(),
+      };
+      if (action === "createFeedbackOption") {
+        const [row] = await db.insert(studentFeedbackOptions).values(values).returning();
+        return Response.json({ item: row }, { status: 201 });
+      }
+      const itemId = id(body.id);
+      if (!itemId) return fail("Mẫu nhận xét không hợp lệ.");
+      const [row] = await db.update(studentFeedbackOptions).set(values).where(eq(studentFeedbackOptions.id, itemId)).returning();
+      return Response.json({ item: row });
+    }
+
+    if (action === "deleteFeedbackOption") {
+      const itemId = id(body.id);
+      if (!itemId) return fail("Mẫu nhận xét không hợp lệ.");
+      await db.delete(studentFeedbackOptions).where(eq(studentFeedbackOptions.id, itemId));
+      return Response.json({ ok: true });
+    }
 
     if (action === "updateCurriculumUnit") {
       const programCode = text(body.programCode);
@@ -249,6 +336,9 @@ export async function POST(request: Request) {
         body.evaluation && typeof body.evaluation === "object"
           ? (body.evaluation as Record<string, unknown>)
           : {};
+      const feedback = Array.isArray(body.feedback)
+        ? body.feedback.map(text).filter(Boolean).slice(0, 30)
+        : [];
       if (!studentId || !programCode || !unitNumber || !teacherName || !checkedAt) {
         return fail("Vui lòng chọn học viên, nội dung kiểm tra, giáo viên và ngày đánh giá.");
       }
@@ -339,7 +429,7 @@ export async function POST(request: Request) {
           studentId,
           classId: student.classId,
           programCode,
-          programLabel: program.label,
+          programLabel: student.level || program.label,
           unitNumber,
           unitLabel: defaultUnit.unitLabel,
           teacherName,
@@ -347,8 +437,9 @@ export async function POST(request: Request) {
           evaluationJson: JSON.stringify(evaluation),
           overallScore,
           result,
+          feedbackJson: JSON.stringify(feedback),
           notes: text(body.notes),
-          actionPlan: text(body.actionPlan),
+          actionPlan: "",
         })
         .returning();
       return Response.json({ item: row }, { status: 201 });

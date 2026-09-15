@@ -197,6 +197,43 @@ export const curriculumOverrides = sqliteTable(
   ]
 );
 
+export const levelOptions = sqliteTable(
+  "level_options",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    label: text("label").notNull(),
+    programCode: text("program_code").notNull().default(""),
+    active: integer("active").notNull().default(1),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_level_options_label_unique").on(table.label),
+    index("idx_level_options_active_sort").on(table.active, table.sortOrder),
+  ]
+);
+
+export const studentFeedbackOptions = sqliteTable(
+  "student_feedback_options",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    category: text("category").notNull().default("Nhận xét chung"),
+    label: text("label").notNull(),
+    active: integer("active").notNull().default(1),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_student_feedback_options_label_unique").on(table.label),
+    index("idx_student_feedback_options_active_sort").on(
+      table.active,
+      table.sortOrder
+    ),
+  ]
+);
+
 export const learningChecks = sqliteTable(
   "learning_checks",
   {
@@ -216,6 +253,7 @@ export const learningChecks = sqliteTable(
     evaluationJson: text("evaluation_json").notNull(),
     overallScore: real("overall_score").notNull(),
     result: text("result").notNull(),
+    feedbackJson: text("feedback_json").notNull().default("[]"),
     notes: text("notes").notNull().default(""),
     actionPlan: text("action_plan").notNull().default(""),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
