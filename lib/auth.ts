@@ -4,7 +4,7 @@ import { getDb } from "@/db";
 import { authLoginAttempts, authSessions, authUsers } from "@/db/schema";
 
 export const AUTH_COOKIE = "we_academic_session";
-export const SESSION_SECONDS = 60 * 60 * 24 * 7;
+export const SESSION_SECONDS = 60 * 60 * 24 * 30;
 
 export const authRoles = [
   "admin",
