@@ -47,6 +47,19 @@ export type LearningCheck = {
   actionPlan: string;
 };
 
+export type StudentCheckQueueItem = {
+  id: number;
+  studentId: number;
+  studentName: string;
+  classId: number | null;
+  className: string | null;
+  level: string;
+  scheduledDate: string;
+  status: "pending" | "completed";
+  createdBy: string;
+  completedAt: string | null;
+};
+
 export const programs: ProgramDefinition[] = [
   { code: "BABY_STARS", label: "Baby Stars", series: "Baby Stars", group: "baby", lessons: 36, color: "rose" },
   { code: "SUPER_KIDS_1", label: "Super Kids 1", series: "Smart Explorers 1", group: "super", lessons: 24, color: "amber" },

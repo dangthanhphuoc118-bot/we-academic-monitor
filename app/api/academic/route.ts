@@ -6,6 +6,7 @@ import {
   curriculumOverrides,
   levelOptions,
   learningChecks,
+  studentCheckQueue,
   studentAssessmentItems,
   studentAssessments,
   students,
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
     const currentUser = await getCurrentUser(request);
     if (!currentUser) return fail("Vui lòng đăng nhập để tiếp tục.", 401);
     const db = getDb();
-    const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows, levelRows, feedbackRows] =
+    const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows, levelRows, feedbackRows, queueRows] =
       await Promise.all([
         db
           .select({
@@ -161,6 +162,24 @@ export async function GET(request: Request) {
           .limit(300),
         db.select().from(levelOptions).orderBy(asc(levelOptions.sortOrder), asc(levelOptions.id)),
         db.select().from(studentFeedbackOptions).orderBy(asc(studentFeedbackOptions.sortOrder), asc(studentFeedbackOptions.id)),
+        db
+          .select({
+            id: studentCheckQueue.id,
+            studentId: studentCheckQueue.studentId,
+            studentName: students.name,
+            classId: studentCheckQueue.classId,
+            className: classes.name,
+            level: students.level,
+            scheduledDate: studentCheckQueue.scheduledDate,
+            status: studentCheckQueue.status,
+            createdBy: studentCheckQueue.createdBy,
+            completedAt: studentCheckQueue.completedAt,
+          })
+          .from(studentCheckQueue)
+          .innerJoin(students, eq(studentCheckQueue.studentId, students.id))
+          .leftJoin(classes, eq(studentCheckQueue.classId, classes.id))
+          .orderBy(desc(studentCheckQueue.scheduledDate), asc(classes.name), asc(students.name))
+          .limit(500),
       ]);
 
     const overrides = new Map(
@@ -202,6 +221,7 @@ export async function GET(request: Request) {
       learningChecks: learningCheckRows,
       levelOptions: levelRows,
       feedbackOptions: feedbackRows,
+      checkQueue: queueRows,
     });
   } catch (error) {
     return fail(messageFor(error), 500);
@@ -332,6 +352,70 @@ export async function POST(request: Request) {
       return Response.json({ ok: true });
     }
 
+    if (action === "scheduleStudentChecks") {
+      const classId = id(body.classId);
+      const scheduledDate = text(body.scheduledDate);
+      const studentIds = Array.isArray(body.studentIds)
+        ? Array.from(new Set(body.studentIds.map(id).filter((value): value is number => Boolean(value))))
+        : [];
+      if (!classId || !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate) || !studentIds.length) {
+        return fail("Vui lòng chọn lớp, ngày kiểm tra và ít nhất một học viên.");
+      }
+      const eligibleStudents = await db
+        .select({ id: students.id, classId: students.classId })
+        .from(students)
+        .where(inArray(students.id, studentIds));
+      if (
+        eligibleStudents.length !== studentIds.length ||
+        eligibleStudents.some((student) => student.classId !== classId)
+      ) {
+        return fail("Danh sách học viên không khớp với lớp đã chọn.");
+      }
+      const timestamp = now();
+      await db.batch([
+        db
+          .delete(studentCheckQueue)
+          .where(
+            and(
+              eq(studentCheckQueue.classId, classId),
+              eq(studentCheckQueue.scheduledDate, scheduledDate),
+              eq(studentCheckQueue.status, "pending")
+            )
+          ),
+        db
+          .insert(studentCheckQueue)
+          .values(
+            studentIds.map((studentId) => ({
+              studentId,
+              classId,
+              scheduledDate,
+              status: "pending",
+              createdBy: actorName,
+              completedAt: null,
+              updatedAt: timestamp,
+            }))
+          )
+          .onConflictDoUpdate({
+            target: [studentCheckQueue.studentId, studentCheckQueue.scheduledDate],
+            set: {
+              classId,
+              status: "pending",
+              createdBy: actorName,
+              completedAt: null,
+              updatedAt: timestamp,
+            },
+          }),
+      ]);
+      return Response.json({ ok: true, scheduled: studentIds.length }, { status: 201 });
+    }
+
+    if (action === "removeStudentCheck") {
+      const itemId = id(body.id);
+      if (!itemId) return fail("Lịch kiểm tra không hợp lệ.");
+      await db.delete(studentCheckQueue).where(eq(studentCheckQueue.id, itemId));
+      return Response.json({ ok: true });
+    }
+
     if (action === "createLearningCheck") {
       const studentId = id(body.studentId);
       const programCode = text(body.programCode);
@@ -382,12 +466,18 @@ export async function POST(request: Request) {
       const clampPercent = (value: unknown) =>
         Math.min(100, Math.max(0, Number(value) || 0));
       let componentPercentages: number[] = [];
+      let hasRedflagComponent = false;
 
       if (program.group === "baby") {
-        componentPercentages = [
-          clampPercent(evaluation.spellingPercent),
-          clampPercent(evaluation.writingPercent),
-        ];
+        const spellingPercent = clampPercent(evaluation.spellingPercent);
+        const writingPercent = clampPercent(evaluation.writingPercent);
+        const oneOrMany = text(evaluation.oneOrMany);
+        const amIsAre = text(evaluation.amIsAre);
+        if (!["correct", "incorrect"].includes(oneOrMany) || !["correct", "incorrect"].includes(amIsAre)) {
+          return fail("Vui lòng đánh giá đủ One or Many và Am – is – are.");
+        }
+        componentPercentages = [spellingPercent, writingPercent];
+        hasRedflagComponent = spellingPercent < 50 || writingPercent < 50;
       } else if (program.group === "super") {
         const vocabularyMax = Math.max(1, unit.vocabularyMax || 1);
         const vocabularyCorrect = Math.min(
@@ -398,35 +488,35 @@ export async function POST(request: Request) {
         if (!['clear', 'unclear'].includes(pronunciation)) {
           return fail("Vui lòng chọn kết quả phát âm Clear hoặc Unclear.");
         }
-        componentPercentages = [
-          (vocabularyCorrect / vocabularyMax) * 100,
-          clampPercent(evaluation.communicationPercent),
-          pronunciation === "clear" ? 100 : 50,
-        ];
+        const vocabularyPercent = (vocabularyCorrect / vocabularyMax) * 100;
+        const communicationPercent = clampPercent(evaluation.communicationPercent);
+        componentPercentages = [vocabularyPercent, communicationPercent];
+        hasRedflagComponent = vocabularyPercent < 70 || communicationPercent < 60;
       } else {
         const pronunciation = text(evaluation.pronunciation);
         if (!['clear', 'unclear'].includes(pronunciation)) {
           return fail("Vui lòng chọn kết quả phát âm Clear hoặc Unclear.");
         }
-        componentPercentages = [
-          clampPercent(evaluation.patternPercent),
-          clampPercent(evaluation.freestylePercent),
-          pronunciation === "clear" ? 100 : 50,
-        ];
+        const oneOrMany = text(evaluation.oneOrMany);
+        const amIsAre = text(evaluation.amIsAre);
+        if (!["correct", "incorrect"].includes(oneOrMany) || !["correct", "incorrect"].includes(amIsAre)) {
+          return fail("Vui lòng đánh giá đủ One or Many và Am – is – are.");
+        }
+        const patternPercent = clampPercent(evaluation.patternPercent);
+        const freestylePercent = clampPercent(evaluation.freestylePercent);
+        componentPercentages = [patternPercent, freestylePercent];
+        hasRedflagComponent = patternPercent < 60 || freestylePercent < 60;
       }
 
       const overallPercent =
         componentPercentages.reduce((sum, value) => sum + value, 0) /
         componentPercentages.length;
       const overallScore = Math.round((overallPercent / 20) * 100) / 100;
-      const result =
-        overallPercent >= 85
-          ? "Tốt"
-          : overallPercent >= 70
-            ? "Đạt"
-            : overallPercent >= 50
-              ? "Cần theo dõi"
-              : "Cần hỗ trợ";
+      const result = hasRedflagComponent
+        ? "Redflag"
+        : overallPercent > 80
+          ? "Good"
+          : "Average";
 
       const [row] = await db
         .insert(learningChecks)
@@ -447,6 +537,15 @@ export async function POST(request: Request) {
           actionPlan: "",
         })
         .returning();
+      await db
+        .update(studentCheckQueue)
+        .set({ status: "completed", completedAt: now(), updatedAt: now() })
+        .where(
+          and(
+            eq(studentCheckQueue.studentId, studentId),
+            eq(studentCheckQueue.scheduledDate, checkedAt)
+          )
+        );
       return Response.json({ item: row }, { status: 201 });
     }
 

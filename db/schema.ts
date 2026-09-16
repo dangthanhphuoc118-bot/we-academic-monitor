@@ -271,6 +271,39 @@ export const learningChecks = sqliteTable(
   ]
 );
 
+export const studentCheckQueue = sqliteTable(
+  "student_check_queue",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    studentId: integer("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    classId: integer("class_id").references(() => classes.id, {
+      onDelete: "set null",
+    }),
+    scheduledDate: text("scheduled_date").notNull(),
+    status: text("status").notNull().default("pending"),
+    createdBy: text("created_by").notNull().default(""),
+    completedAt: text("completed_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_student_check_queue_student_date").on(
+      table.studentId,
+      table.scheduledDate
+    ),
+    index("idx_student_check_queue_date_status").on(
+      table.scheduledDate,
+      table.status
+    ),
+    index("idx_student_check_queue_class_date").on(
+      table.classId,
+      table.scheduledDate
+    ),
+  ]
+);
+
 export const authUsers = sqliteTable(
   "auth_users",
   {
