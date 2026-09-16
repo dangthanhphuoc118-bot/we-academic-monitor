@@ -1,4 +1,4 @@
-# Thay đổi phiên bản ngày 15 09 2026
+# Thay đổi phiên bản ngày 16 09 2026
 
 Phiên bản này cập nhật website theo bốn trang yêu cầu trong file PDF.
 
@@ -20,12 +20,22 @@ Phiên bản này cập nhật website theo bốn trang yêu cầu trong file PD
 - Thêm trang Tài khoản để Admin tự tạo người dùng, phân quyền, đổi PIN và khóa/mở tài khoản.
 - Academic Manager và Academic Leader có cùng quyền học vụ: quản lý dữ liệu, kiểm tra học viên, đánh giá giáo viên và xem báo cáo.
 - PIN được băm bằng PBKDF2; phiên đăng nhập dùng cookie HttpOnly, Secure và SameSite; có giới hạn số lần nhập sai.
+- Phiên đăng nhập được kéo dài thành 30 ngày trên thiết bị, hoặc kết thúc ngay khi người dùng đăng xuất.
+- Trang Lớp học có bộ lọc theo ngày/Thứ với múi giờ Việt Nam và bộ lọc tất cả lớp.
+- Có thể mở từng lớp, tick nhiều học viên và đưa cả danh sách vào lịch kiểm tra của một ngày.
+- Trang Kiểm tra học viên hiển thị danh sách chờ theo từng lớp; lưu xong tự chuyển sang học viên kế tiếp.
+- Cập nhật khung Baby Stars và Super Kids 1–8 theo tài liệu mới; giữ nội dung Starters, Movers và Flyers từ file đính kèm.
+- Tách Vocabulary và Grammar/Communication thành các khối riêng; từng mục từ vựng hiển thị riêng để không bị dồn vào một ô.
+- Thêm thẻ đúng/sai `One or Many` và `Am – is – are` cho Baby Stars và Starters/Movers/Flyers.
+- Báo cáo học viên ban đầu chỉ hiển thị ba thẻ Good, Average và Redflag; bấm vào thẻ mới mở danh sách chi tiết.
 
 ## Quy tắc chia vùng báo cáo
 
-- Good: kết quả Tốt.
-- Average: kết quả Đạt.
-- Redflag: kết quả Cần theo dõi hoặc Cần hỗ trợ.
+- Baby Stars: Spelling hoặc Writing dưới 50% thì Redflag. Nếu không có Redflag, lấy trung bình; trên 80% là Good, còn lại là Average.
+- Super Kids: Vocabulary dưới 70% hoặc Communication dưới 60% thì Redflag. Nếu không có Redflag, lấy trung bình; trên 80% là Good, còn lại là Average.
+- Starters, Movers, Flyers: Pattern hoặc Freestyle dưới 60% thì Redflag. Nếu không có Redflag, lấy trung bình; trên 80% là Good, còn lại là Average.
+- Pronunciation, One or Many và Am – is – are được lưu để theo dõi chi tiết nhưng không kéo thay đổi trung bình của hai tiêu chí chính.
+- Kết quả cũ `Tốt`, `Đạt`, `Cần theo dõi`, `Cần hỗ trợ` vẫn được đọc và đưa vào ba nhóm tương ứng, nên không cần sửa dữ liệu lịch sử.
 
 Mỗi học viên được xếp theo lần kiểm tra gần nhất. Học viên chưa từng được đánh giá được đếm riêng và chưa nằm trong ba vùng.
 
@@ -47,10 +57,16 @@ Migration đăng nhập là `drizzle/0003_dazzling_susan_delgado.sql`. Migration
 
 Migration `0003` không thay đổi các bảng học viên, lớp, giáo viên hoặc lịch sử đánh giá.
 
+Migration danh sách chờ là `drizzle/0004_rich_masked_marvel.sql`. Migration này chỉ tạo bảng:
+
+- `student_check_queue`.
+
+Migration `0004` không sửa, xóa hoặc làm trống dữ liệu hiện có.
+
 ## Kiểm tra kỹ thuật đã thực hiện
 
 - ESLint đạt.
 - Build Vinext đạt.
 - Cloudflare Wrangler deploy dry run đạt.
-- Ba migration D1 chạy thành công trên cơ sở dữ liệu kiểm thử mới.
+- Năm migration D1 chạy thành công trên cơ sở dữ liệu kiểm thử mới.
 - Dữ liệu mặc định sau migration gồm 20 chương trình hoặc trình độ và 8 mẫu nhận xét.

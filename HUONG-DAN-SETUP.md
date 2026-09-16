@@ -84,6 +84,7 @@ Kết quả phải có các bảng chính:
 - `learning_checks`
 - `level_options`
 - `student_feedback_options`
+- `student_check_queue`
 - `auth_users`
 - `auth_sessions`
 - `auth_login_attempts`
@@ -149,6 +150,8 @@ Không ghi PIN thật vào `wrangler.jsonc`, GitHub, README hoặc ảnh chụp 
 
 PIN được băm trước khi lưu. Sau 5 lần nhập sai từ cùng email và địa chỉ truy cập, đăng nhập sẽ bị khóa tạm thời 15 phút.
 
+Phiên đăng nhập hợp lệ trong 30 ngày trên thiết bị. Người dùng có thể kết thúc phiên ngay bằng nút **Đăng xuất**.
+
 ## 6. Kiểm tra sau khi triển khai
 
 1. Mở địa chỉ `workers.dev`.
@@ -157,8 +160,10 @@ PIN được băm trước khi lưu. Sau 5 lần nhập sai từ cùng email và
 4. Vào **Giáo viên** và thêm một giáo viên thử.
 5. Vào **Lớp học**, tạo lớp và chọn đúng chương trình như `Super Kids 1`.
 6. Vào **Học viên**, thêm học viên vào lớp.
-7. Đăng nhập bằng Academic Leader, mở **Kiểm tra học viên**, chọn Unit/Day và lưu một đánh giá thử.
-8. Kiểm tra cả Academic Manager và Academic Leader đều mở được phần quản lý học vụ, đánh giá giáo viên và báo cáo.
+7. Đăng nhập bằng Academic Leader, mở **Lớp học**, chọn ngày và tick nhiều học viên cần kiểm tra.
+8. Mở **Kiểm tra học viên**, xác nhận danh sách đã được nhóm theo lớp, chọn Unit/Day và lưu một đánh giá thử.
+9. Mở **Báo cáo**, kiểm tra ba thẻ Good, Average và Redflag rồi bấm từng thẻ để xem danh sách.
+10. Kiểm tra cả Academic Manager và Academic Leader đều mở được phần quản lý học vụ, đánh giá giáo viên và báo cáo.
 
 ## 7. Bảo vệ bổ sung bằng Cloudflare Access
 
@@ -175,7 +180,7 @@ Cloudflare Access kiểm soát thêm một lớp bên ngoài. Bên trong ứng d
 
 ## 8. Cập nhật website về sau
 
-### Cập nhật phiên bản chỉnh sửa theo file PDF ngày 15/09/2026
+### Cập nhật phiên bản chỉnh sửa theo file PDF ngày 16/09/2026
 
 1. Sao lưu D1 trước khi cập nhật:
 
@@ -195,7 +200,7 @@ Deploy command: npm run deploy
 
 Không nhập `npm wrangler deploy`; đây không phải cú pháp npm hợp lệ.
 
-Lệnh `npm run deploy` sẽ tự chạy các migration chưa áp dụng. Bản đăng nhập mới chạy `0003_dazzling_susan_delgado.sql`; migration này chỉ thêm ba bảng đăng nhập và không xóa danh sách học viên, lớp, giáo viên hay lịch sử hiện có.
+Lệnh `npm run deploy` sẽ tự chạy các migration chưa áp dụng. Bản hiện tại chạy thêm `0004_rich_masked_marvel.sql`; migration này chỉ thêm bảng danh sách chờ kiểm tra và không xóa danh sách học viên, lớp, giáo viên hay lịch sử hiện có.
 
 6. Sau khi deploy, cấu hình Admin ban đầu theo mục 5 rồi kiểm tra lần lượt: **Tài khoản → Khung chương trình → Mẫu nhận xét → Kiểm tra học viên → Báo cáo**.
 

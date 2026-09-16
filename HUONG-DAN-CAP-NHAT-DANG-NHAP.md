@@ -28,7 +28,7 @@ Build command: npm run build
 Deploy command: npm run deploy
 ```
 
-Deploy sẽ áp dụng migration `0003_dazzling_susan_delgado.sql`. Migration chỉ tạo ba bảng đăng nhập và không xóa dữ liệu học viên.
+Deploy sẽ áp dụng các migration còn thiếu. Bản cập nhật mới nhất có `0004_rich_masked_marvel.sql`; migration này chỉ thêm bảng danh sách chờ kiểm tra và không xóa dữ liệu học viên.
 
 ## Tạo Admin đầu tiên trên Cloudflare
 
@@ -51,6 +51,8 @@ Deploy sẽ áp dụng migration `0003_dazzling_susan_delgado.sql`. Migration ch
 
 Admin có thể đổi email, đổi PIN, đổi vai trò hoặc tạm khóa từng tài khoản ngay trên website.
 
+Phiên đăng nhập được lưu bằng cookie bảo mật trong **30 ngày** trên thiết bị. Đăng xuất sẽ xóa phiên ngay lập tức.
+
 ## Kiểm tra sau cập nhật
 
 1. Academic Manager và Academic Leader nhìn thấy cùng các màn hình học vụ.
@@ -58,5 +60,7 @@ Admin có thể đổi email, đổi PIN, đổi vai trò hoặc tạm khóa t�
 3. Lưu thử một kết quả; hệ thống tự ghi nhận tài khoản thực hiện ở D1.
 4. Cả Academic Manager và Academic Leader mở được phần quản lý, đánh giá giáo viên và báo cáo.
 5. Admin mở được toàn bộ website và menu **Tài khoản**.
+6. Tại **Lớp học**, chọn ngày, chọn nhiều học viên rồi xác nhận; danh sách phải xuất hiện theo từng lớp tại **Kiểm tra học viên**.
+7. Báo cáo học viên ban đầu hiển thị đúng ba thẻ **Good – Average – Redflag**; bấm từng thẻ để xem chi tiết.
 
 Sau khi Admin đầu tiên đã được tạo trong D1, có thể xóa hai biến `BOOTSTRAP_ADMIN_EMAIL` và `BOOTSTRAP_ADMIN_PIN` khỏi Cloudflare. Không chia sẻ PIN qua ảnh chụp màn hình.

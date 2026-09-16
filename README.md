@@ -8,11 +8,14 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Khung chương trình Baby Stars, Super Kids 1–8, Starters, Movers và Flyers.
 - Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
+- Chọn nhiều học viên theo lớp/ngày và đưa vào danh sách chờ kiểm tra được nhóm theo lớp.
+- Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
 - Hiển thị riêng Vocabulary và Grammar / Communication trong khung chương trình.
 - Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
 - Đánh giá giáo viên.
 - Báo cáo học viên theo ba vùng Good, Average và Redflag kèm nhận xét/lý do.
+- Quy tắc Good/Average/Redflag riêng cho Baby Stars, Super Kids và Starters/Movers/Flyers.
 - Đăng nhập bằng email và mã PIN, có ba vai trò Admin, Academic Manager và Academic Leader.
 - Admin tự tạo, chỉnh sửa, phân quyền, đổi PIN hoặc khóa tài khoản trên website.
 - Academic Manager và Academic Leader có cùng quyền quản lý học vụ, kiểm tra học viên, đánh giá giáo viên và xem báo cáo.
@@ -49,8 +52,9 @@ npm run deploy
 - Không chỉnh sửa hoặc xóa các migration cũ trong thư mục `drizzle/` sau khi đã triển khai.
 - Migration `0002_grey_sentinels.sql` chỉ bổ sung cấu hình và nhận xét; không xóa dữ liệu học viên hiện có.
 - Migration `0003_dazzling_susan_delgado.sql` chỉ tạo các bảng đăng nhập; không sửa hoặc xóa dữ liệu học vụ hiện có.
+- Migration `0004_rich_masked_marvel.sql` chỉ tạo bảng danh sách chờ kiểm tra; không sửa hoặc xóa dữ liệu học vụ hiện có.
 - Trước mỗi thay đổi lớn, xuất bản sao D1 theo hướng dẫn trong `HUONG-DAN-SETUP.md`.
 
 ## Bảo mật
 
-Website yêu cầu email và PIN trước khi tải dữ liệu. PIN được băm trước khi lưu, phiên đăng nhập dùng cookie bảo mật và tài khoản bị chặn tạm thời sau nhiều lần nhập sai. Cloudflare Access vẫn có thể được bật như một lớp bảo vệ bổ sung.
+Website yêu cầu email và PIN trước khi tải dữ liệu. PIN được băm trước khi lưu, phiên đăng nhập dùng cookie bảo mật trong 30 ngày và tài khoản bị chặn tạm thời sau nhiều lần nhập sai. Cloudflare Access vẫn có thể được bật như một lớp bảo vệ bổ sung.
