@@ -414,8 +414,9 @@ export async function POST(request: Request) {
       return Response.json({ ok: true });
     }
 
-    if (action === "createLearningCheck") {
+    if (action === "createLearningCheck" || action === "updateLearningCheck") {
       const studentId = id(body.studentId);
+      const checkId = action === "updateLearningCheck" ? id(body.id) : null;
       const programCode = text(body.programCode);
       const unitNumber = id(body.unitNumber);
       const checkedAt = text(body.checkedAt);
@@ -428,6 +429,14 @@ export async function POST(request: Request) {
         : [];
       if (!studentId || !programCode || !unitNumber || !checkedAt) {
         return fail("Vui lòng chọn học viên, nội dung kiểm tra và ngày đánh giá.");
+      }
+      if (action === "updateLearningCheck" && !checkId) return fail("Bản đánh giá không hợp lệ.");
+
+      let existingCheck: { studentId: number; programLabel: string } | undefined;
+      if (checkId) {
+        [existingCheck] = await db.select({ studentId: learningChecks.studentId, programLabel: learningChecks.programLabel }).from(learningChecks).where(eq(learningChecks.id, checkId)).limit(1);
+        if (!existingCheck) return fail("Không tìm thấy bản đánh giá cần cập nhật.", 404);
+        if (existingCheck.studentId !== studentId) return fail("Không thể chuyển kết quả sang học viên khác.", 409);
       }
 
       const program = programs.find((item) => item.code === programCode);
@@ -469,11 +478,6 @@ export async function POST(request: Request) {
       if (program.group === "baby") {
         const spellingPercent = clampPercent(evaluation.spellingPercent);
         const writingPercent = clampPercent(evaluation.writingPercent);
-        const oneOrMany = text(evaluation.oneOrMany);
-        const amIsAre = text(evaluation.amIsAre);
-        if (!["correct", "incorrect"].includes(oneOrMany) || !["correct", "incorrect"].includes(amIsAre)) {
-          return fail("Vui lòng đánh giá đủ One or Many và Am – is – are.");
-        }
         componentPercentages = [spellingPercent, writingPercent];
         hasRedflagComponent = spellingPercent < 50 || writingPercent < 50;
       } else if (program.group === "super") {
@@ -516,23 +520,32 @@ export async function POST(request: Request) {
           ? "Good"
           : "Average";
 
+      const checkValues = {
+        programCode,
+        programLabel: existingCheck?.programLabel || student.level || program.label,
+        unitNumber,
+        unitLabel: defaultUnit.unitLabel,
+        checkedAt,
+        evaluationJson: JSON.stringify(evaluation),
+        overallScore,
+        result,
+        feedbackJson: JSON.stringify(feedback),
+        notes: text(body.notes),
+        actionPlan: "",
+      };
+
+      if (checkId) {
+        const [row] = await db.update(learningChecks).set(checkValues).where(eq(learningChecks.id, checkId)).returning();
+        return Response.json({ item: row });
+      }
+
       const [row] = await db
         .insert(learningChecks)
         .values({
           studentId,
           classId: student.classId,
-          programCode,
-          programLabel: student.level || program.label,
-          unitNumber,
-          unitLabel: defaultUnit.unitLabel,
           teacherName: actorName,
-          checkedAt,
-          evaluationJson: JSON.stringify(evaluation),
-          overallScore,
-          result,
-          feedbackJson: JSON.stringify(feedback),
-          notes: text(body.notes),
-          actionPlan: "",
+          ...checkValues,
         })
         .returning();
       await db
