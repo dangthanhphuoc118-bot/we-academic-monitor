@@ -28,6 +28,11 @@ Phiên bản này cập nhật website theo bốn trang yêu cầu trong file PD
 - Tách Vocabulary và Grammar/Communication thành các khối riêng; từng mục từ vựng hiển thị riêng để không bị dồn vào một ô.
 - Thêm thẻ đúng/sai `One or Many` và `Am – is – are` cho Baby Stars và Starters/Movers/Flyers.
 - Báo cáo học viên ban đầu chỉ hiển thị ba thẻ Good, Average và Redflag; bấm vào thẻ mới mở danh sách chi tiết.
+- Thẻ lớp mở trực tiếp danh sách học viên; mỗi học viên có nút **Kiểm tra ngay** để mở phiếu đánh giá ngay trên trang Lớp học, không cần chuyển tab.
+- Việc đưa nhiều học viên vào danh sách chờ vẫn được giữ lại như một lựa chọn bổ sung và không tự chuyển trang sau khi xếp lịch.
+- Xóa trường trình độ khỏi thẻ lớp và biểu mẫu tạo/sửa lớp. Trình độ chỉ còn được quản lý ở từng học viên và quyết định khung đánh giá tương ứng.
+- Xóa các đoạn mô tả dài trong ba thẻ kết quả Good, Average và Redflag.
+- Thêm hai biểu đồ tròn so sánh tỷ lệ Good, Average và Redflag giữa lần kiểm tra trước với lần kiểm tra mới nhất trên cùng nhóm học viên có ít nhất hai lần kiểm tra.
 
 ## Quy tắc chia vùng báo cáo
 
@@ -62,6 +67,8 @@ Migration danh sách chờ là `drizzle/0004_rich_masked_marvel.sql`. Migration 
 - `student_check_queue`.
 
 Migration `0004` không sửa, xóa hoặc làm trống dữ liệu hiện có.
+
+Các chỉnh sửa theo file `Ở trang này(2).pdf` không cần migration mới. Cột trình độ lớp cũ được giữ nguyên trong cơ sở dữ liệu để tránh thay đổi phá vỡ dữ liệu, nhưng không còn hiển thị hoặc được sử dụng trong giao diện và nghiệp vụ mới.
 
 ## Kiểm tra kỹ thuật đã thực hiện
 

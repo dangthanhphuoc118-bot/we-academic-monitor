@@ -6,15 +6,17 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 - Quản lý lớp, học viên và giáo viên.
 - Khung chương trình Baby Stars, Super Kids 1–8, Starters, Movers và Flyers.
-- Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
+- Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ của học viên.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
-- Chọn nhiều học viên theo lớp/ngày và đưa vào danh sách chờ kiểm tra được nhóm theo lớp.
+- Mở thẻ lớp để xem học viên và kiểm tra trực tiếp ngay tại trang Lớp học.
+- Có thể chọn nhiều học viên theo lớp/ngày và đưa vào danh sách chờ kiểm tra được nhóm theo lớp.
 - Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
 - Hiển thị riêng Vocabulary và Grammar / Communication trong khung chương trình.
 - Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
 - Đánh giá giáo viên.
 - Báo cáo học viên theo ba vùng Good, Average và Redflag kèm nhận xét/lý do.
+- Hai biểu đồ tròn so sánh tỷ lệ ba mức độ giữa lần kiểm tra trước và lần mới nhất.
 - Quy tắc Good/Average/Redflag riêng cho Baby Stars, Super Kids và Starters/Movers/Flyers.
 - Đăng nhập bằng email và mã PIN, có ba vai trò Admin, Academic Manager và Academic Leader.
 - Admin tự tạo, chỉnh sửa, phân quyền, đổi PIN hoặc khóa tài khoản trên website.

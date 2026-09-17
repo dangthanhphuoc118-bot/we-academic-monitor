@@ -158,11 +158,11 @@ Phiên đăng nhập hợp lệ trong 30 ngày trên thiết bị. Người dùn
 2. Đăng nhập bằng tài khoản Admin vừa tạo.
 3. Vào **Tài khoản**, tạo thử một Academic Manager và một Academic Leader.
 4. Vào **Giáo viên** và thêm một giáo viên thử.
-5. Vào **Lớp học**, tạo lớp và chọn đúng chương trình như `Super Kids 1`.
+5. Vào **Lớp học** và tạo lớp. Trình độ được chọn riêng khi tạo từng học viên, không nhập ở lớp.
 6. Vào **Học viên**, thêm học viên vào lớp.
-7. Đăng nhập bằng Academic Leader, mở **Lớp học**, chọn ngày và tick nhiều học viên cần kiểm tra.
+7. Đăng nhập bằng Academic Leader, mở **Lớp học**, mở danh sách học viên của lớp rồi bấm **Kiểm tra ngay** để đánh giá tại chỗ. Nếu cần xếp lịch hàng loạt, chọn ngày và tick nhiều học viên để đưa vào danh sách chờ.
 8. Mở **Kiểm tra học viên**, xác nhận danh sách đã được nhóm theo lớp, chọn Unit/Day và lưu một đánh giá thử.
-9. Mở **Báo cáo**, kiểm tra ba thẻ Good, Average và Redflag rồi bấm từng thẻ để xem danh sách.
+9. Mở **Báo cáo**, kiểm tra ba thẻ Good, Average và Redflag, hai biểu đồ so sánh lần trước/lần mới nhất rồi bấm từng thẻ để xem danh sách.
 10. Kiểm tra cả Academic Manager và Academic Leader đều mở được phần quản lý học vụ, đánh giá giáo viên và báo cáo.
 
 ## 7. Bảo vệ bổ sung bằng Cloudflare Access
