@@ -261,7 +261,6 @@ export async function POST(request: Request) {
       if (!current) return fail("Không tìm thấy chương trình hoặc trình độ.", 404);
       const [row] = await db.update(levelOptions).set(values).where(eq(levelOptions.id, itemId)).returning();
       if (current.label !== label) {
-        await db.update(classes).set({ level: label, updatedAt: now() }).where(eq(classes.level, current.label));
         await db.update(students).set({ level: label, updatedAt: now() }).where(eq(students.level, current.label));
       }
       return Response.json({ item: row });
@@ -272,9 +271,8 @@ export async function POST(request: Request) {
       if (!itemId) return fail("Chương trình hoặc trình độ không hợp lệ.");
       const [current] = await db.select().from(levelOptions).where(eq(levelOptions.id, itemId)).limit(1);
       if (!current) return fail("Không tìm thấy chương trình hoặc trình độ.", 404);
-      const [classUse] = await db.select({ total: count() }).from(classes).where(eq(classes.level, current.label));
       const [studentUse] = await db.select({ total: count() }).from(students).where(eq(students.level, current.label));
-      if (Number(classUse.total) + Number(studentUse.total) > 0) {
+      if (Number(studentUse.total) > 0) {
         return fail("Trình độ đang được sử dụng. Hãy chuyển sang trạng thái tạm ẩn thay vì xóa.", 409);
       }
       await db.delete(levelOptions).where(eq(levelOptions.id, itemId));
@@ -558,11 +556,9 @@ export async function POST(request: Request) {
 
     if (action === "createClass" || action === "updateClass") {
       const name = text(body.name);
-      const level = text(body.level);
-      if (!name || !level) return fail("Vui lòng nhập tên lớp và trình độ.");
+      if (!name) return fail("Vui lòng nhập tên lớp.");
       const values = {
         name,
-        level,
         schedule: text(body.schedule),
         room: text(body.room),
         teacherId: id(body.teacherId),
@@ -570,7 +566,7 @@ export async function POST(request: Request) {
         updatedAt: now(),
       };
       if (action === "createClass") {
-        const [row] = await db.insert(classes).values(values).returning();
+        const [row] = await db.insert(classes).values({ ...values, level: "" }).returning();
         return Response.json({ item: row }, { status: 201 });
       }
       const itemId = id(body.id);
