@@ -6,22 +6,22 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 - Quản lý lớp, học viên và giáo viên.
 - Khung chương trình Baby Stars, Super Kids 1–8, Starters, Movers và Flyers.
-- Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ của học viên.
+- Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
-- Mở thẻ lớp để xem học viên và kiểm tra trực tiếp ngay tại trang Lớp học.
-- Có thể chọn nhiều học viên theo lớp/ngày và đưa vào danh sách chờ kiểm tra được nhóm theo lớp.
-- Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp.
+- Mở phiếu kiểm tra trực tiếp từ từng học viên trong danh sách lớp.
+- Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp; lớp không còn gắn cứng với một trình độ.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
-- Hiển thị riêng Vocabulary và Grammar / Communication trong khung chương trình.
+- Khung Movers mới hiển thị riêng 5 nhóm ADJ, NOUN, VERB, ADV và PREPOSITION.
+- Bộ câu hỏi Freestyle cho Starters, Movers và Flyers tự chọn ngẫu nhiên đúng 5 câu và có nút đổi câu.
 - Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
 - Đánh giá giáo viên.
-- Báo cáo học viên theo ba vùng Good, Average và Redflag kèm nhận xét/lý do.
-- Hai biểu đồ tròn so sánh tỷ lệ ba mức độ giữa lần kiểm tra trước và lần mới nhất.
+- Báo cáo học viên theo ba vùng Good, Average và Redflag, hiển thị chi tiết Evaluation Criteria, biểu đồ so sánh và lịch sử kiểm tra.
+- Cập nhật lại kết quả vừa lưu hoặc kết quả cũ trên đúng bản ghi, không tạo bản trùng.
 - Quy tắc Good/Average/Redflag riêng cho Baby Stars, Super Kids và Starters/Movers/Flyers.
 - Đăng nhập bằng email và mã PIN, có ba vai trò Admin, Academic Manager và Academic Leader.
 - Admin tự tạo, chỉnh sửa, phân quyền, đổi PIN hoặc khóa tài khoản trên website.
 - Academic Manager và Academic Leader có cùng quyền quản lý học vụ, kiểm tra học viên, đánh giá giáo viên và xem báo cáo.
-- Tên người thực hiện đánh giá được ghi nhận tự động từ tài khoản đăng nhập, không cần nhập thủ công.
+- Người thực hiện được ghi nhận tự động từ tài khoản đăng nhập; phiếu không còn ô nhập tên giáo viên.
 
 ## Yêu cầu
 

@@ -158,11 +158,11 @@ Phiên đăng nhập hợp lệ trong 30 ngày trên thiết bị. Người dùn
 2. Đăng nhập bằng tài khoản Admin vừa tạo.
 3. Vào **Tài khoản**, tạo thử một Academic Manager và một Academic Leader.
 4. Vào **Giáo viên** và thêm một giáo viên thử.
-5. Vào **Lớp học** và tạo lớp. Trình độ được chọn riêng khi tạo từng học viên, không nhập ở lớp.
-6. Vào **Học viên**, thêm học viên vào lớp.
-7. Đăng nhập bằng Academic Leader, mở **Lớp học**, mở danh sách học viên của lớp rồi bấm **Kiểm tra ngay** để đánh giá tại chỗ. Nếu cần xếp lịch hàng loạt, chọn ngày và tick nhiều học viên để đưa vào danh sách chờ.
-8. Mở **Kiểm tra học viên**, xác nhận danh sách đã được nhóm theo lớp, chọn Unit/Day và lưu một đánh giá thử.
-9. Mở **Báo cáo**, kiểm tra ba thẻ Good, Average và Redflag, hai biểu đồ so sánh lần trước/lần mới nhất rồi bấm từng thẻ để xem danh sách.
+5. Vào **Lớp học** và tạo một lớp; trình độ được đặt riêng trên từng học viên.
+6. Vào **Học viên**, thêm học viên vào lớp và chọn đúng trình độ như `Super Kids 1`.
+7. Đăng nhập bằng Academic Leader, mở **Lớp học**, chọn ngày, mở danh sách học viên rồi bấm **Kiểm tra ngay**.
+8. Chọn Unit/Day, nhập đủ tiêu chí và lưu một đánh giá thử. Với Starters, Movers hoặc Flyers, thử nút **Đổi 5 câu**.
+9. Mở **Báo cáo**, kiểm tra ba thẻ Good, Average và Redflag; mở lịch sử và thử **Cập nhật** kết quả vừa lưu.
 10. Kiểm tra cả Academic Manager và Academic Leader đều mở được phần quản lý học vụ, đánh giá giáo viên và báo cáo.
 
 ## 7. Bảo vệ bổ sung bằng Cloudflare Access
@@ -180,7 +180,7 @@ Cloudflare Access kiểm soát thêm một lớp bên ngoài. Bên trong ứng d
 
 ## 8. Cập nhật website về sau
 
-### Cập nhật phiên bản chỉnh sửa theo file PDF ngày 16/09/2026
+### Cập nhật phiên bản chỉnh sửa theo file PDF ngày 17/09/2026
 
 1. Sao lưu D1 trước khi cập nhật:
 
@@ -200,9 +200,9 @@ Deploy command: npm run deploy
 
 Không nhập `npm wrangler deploy`; đây không phải cú pháp npm hợp lệ.
 
-Lệnh `npm run deploy` sẽ tự chạy các migration chưa áp dụng. Bản hiện tại chạy thêm `0004_rich_masked_marvel.sql`; migration này chỉ thêm bảng danh sách chờ kiểm tra và không xóa danh sách học viên, lớp, giáo viên hay lịch sử hiện có.
+Lệnh `npm run deploy` sẽ tự chạy các migration chưa áp dụng. Bản cập nhật ngày 17/09/2026 không thêm migration mới và không xóa danh sách học viên, lớp, giáo viên hay lịch sử hiện có.
 
-6. Sau khi deploy, cấu hình Admin ban đầu theo mục 5 rồi kiểm tra lần lượt: **Tài khoản → Khung chương trình → Mẫu nhận xét → Kiểm tra học viên → Báo cáo**.
+6. Sau khi deploy, kiểm tra lần lượt: **Lớp học → Học viên → Kiểm tra ngay → Khung chương trình → Mẫu nhận xét → Báo cáo**.
 
 ### Quy trình cập nhật thông thường
 

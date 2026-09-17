@@ -1,4 +1,32 @@
-# Thay đổi phiên bản ngày 16 09 2026
+# Thay đổi phiên bản ngày 17/09/2026
+
+## Nội dung cập nhật mới
+
+- Xóa nút **Bắt đầu kiểm tra** trên Tổng quan và tab **Kiểm tra học viên** khỏi thanh điều hướng.
+- Tại **Lớp học**, mở danh sách học viên rồi bấm **Kiểm tra ngay** để mở phiếu trực tiếp.
+- Lớp không còn trường chương trình/trình độ; trình độ được quản lý riêng trên từng học viên.
+- Xóa toàn bộ Writing Reference. Baby Stars chỉ còn Spelling và Writing, không còn hai thẻ đúng/sai.
+- Xóa mô tả ngưỡng Redflag/Average/Good dưới các ô chấm điểm.
+- Thay toàn bộ 12 Unit Movers theo tài liệu mới và chia từ vựng thành 5 nhóm **ADJ, NOUN, VERB, ADV, PREPOSITION**.
+- Thêm ngân hàng câu hỏi Freestyle cho Starters, Movers và Flyers; mỗi phiếu lấy ngẫu nhiên đúng 5 câu và có nút **Đổi 5 câu**.
+- Năm câu đã dùng được lưu cùng kết quả để khi mở lại vẫn hiển thị đúng bộ câu cũ.
+- Báo cáo hiển thị chi tiết **Evaluation Criteria**, hai biểu đồ so sánh lần trước/lần mới nhất và lịch sử kiểm tra.
+- Có thể mở kết quả vừa lưu hoặc kết quả cũ để cập nhật đúng bản ghi, không tạo bản trùng.
+- Bản này không thêm migration và không xóa dữ liệu hiện có.
+
+## Kiểm tra kỹ thuật bản 17/09/2026
+
+- ESLint đạt.
+- TypeScript `tsc --noEmit` đạt.
+- Build Vinext production đạt.
+- Toàn bộ 5 migration D1 chạy thành công trên cơ sở dữ liệu local mới.
+- Ngân hàng câu hỏi gồm 60 câu Starters, 71 câu Movers khả dụng từ phần scan nhìn thấy và 32 câu Flyers.
+
+Gói `SAFE` không chứa `wrangler.jsonc`, do đó Database ID thật trong repository GitHub hiện tại không bị ghi đè khi chép bản cập nhật.
+
+---
+
+# Thay đổi phiên bản ngày 16/09/2026
 
 Phiên bản này cập nhật website theo bốn trang yêu cầu trong file PDF.
 
@@ -28,11 +56,6 @@ Phiên bản này cập nhật website theo bốn trang yêu cầu trong file PD
 - Tách Vocabulary và Grammar/Communication thành các khối riêng; từng mục từ vựng hiển thị riêng để không bị dồn vào một ô.
 - Thêm thẻ đúng/sai `One or Many` và `Am – is – are` cho Baby Stars và Starters/Movers/Flyers.
 - Báo cáo học viên ban đầu chỉ hiển thị ba thẻ Good, Average và Redflag; bấm vào thẻ mới mở danh sách chi tiết.
-- Thẻ lớp mở trực tiếp danh sách học viên; mỗi học viên có nút **Kiểm tra ngay** để mở phiếu đánh giá ngay trên trang Lớp học, không cần chuyển tab.
-- Việc đưa nhiều học viên vào danh sách chờ vẫn được giữ lại như một lựa chọn bổ sung và không tự chuyển trang sau khi xếp lịch.
-- Xóa trường trình độ khỏi thẻ lớp và biểu mẫu tạo/sửa lớp. Trình độ chỉ còn được quản lý ở từng học viên và quyết định khung đánh giá tương ứng.
-- Xóa các đoạn mô tả dài trong ba thẻ kết quả Good, Average và Redflag.
-- Thêm hai biểu đồ tròn so sánh tỷ lệ Good, Average và Redflag giữa lần kiểm tra trước với lần kiểm tra mới nhất trên cùng nhóm học viên có ít nhất hai lần kiểm tra.
 
 ## Quy tắc chia vùng báo cáo
 
@@ -67,8 +90,6 @@ Migration danh sách chờ là `drizzle/0004_rich_masked_marvel.sql`. Migration 
 - `student_check_queue`.
 
 Migration `0004` không sửa, xóa hoặc làm trống dữ liệu hiện có.
-
-Các chỉnh sửa theo file `Ở trang này(2).pdf` không cần migration mới. Cột trình độ lớp cũ được giữ nguyên trong cơ sở dữ liệu để tránh thay đổi phá vỡ dữ liệu, nhưng không còn hiển thị hoặc được sử dụng trong giao diện và nghiệp vụ mới.
 
 ## Kiểm tra kỹ thuật đã thực hiện
 
