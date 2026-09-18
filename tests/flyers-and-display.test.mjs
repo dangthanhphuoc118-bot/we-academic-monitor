@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
 import { curriculumDefaults } from "../lib/curriculum.ts";
+import { sampleSpeakingQuestions, speakingQuestions } from "../lib/speaking-questions.ts";
 import { parseVocabularyGroups, vocabularyGroupLabels } from "../lib/vocabulary.ts";
 
 const flyers = curriculumDefaults.filter((unit) => unit.programCode === "FLYERS");
@@ -46,6 +47,26 @@ test("Empty columns remain present and Movers grouping is unchanged", () => {
   }
   assert.deepEqual(parseVocabularyGroups("Cat - Dog"), []);
   assert.equal(parseVocabularyGroups("adj: Happy\r\nNOUN: Book").length, 5);
+});
+
+test("Every Cambridge unit owns an editable Freestyle bank and samples five questions", () => {
+  const cambridge = curriculumDefaults.filter((unit) => unit.group === "cambridge");
+  assert.equal(cambridge.length, 36);
+  for (const unit of cambridge) {
+    assert.ok(unit.freestyleQuestions.length >= 5, `${unit.programCode} ${unit.unitLabel}`);
+    assert.deepEqual(unit.freestyleQuestions, speakingQuestions[unit.programCode]);
+  }
+  assert.notEqual(cambridge[0].freestyleQuestions, cambridge[1].freestyleQuestions);
+  const bank = ["A?", "B?", "C?", "D?", "E?", "F?"];
+  const sampled = sampleSpeakingQuestions(bank);
+  assert.equal(sampled.length, 5);
+  assert.equal(new Set(sampled).size, 5);
+  assert.ok(sampled.every((question) => bank.includes(question)));
+
+  const form = readFileSync(new URL("../app/curriculum-check.tsx", import.meta.url), "utf8");
+  assert.ok(form.includes("Freestyle question bank"));
+  assert.ok(form.includes("unit.freestyleQuestions"));
+  assert.ok(form.includes("mỗi câu trên một dòng"));
 });
 
 test("Dashboard and check form do not render aggregate /5 scores", () => {

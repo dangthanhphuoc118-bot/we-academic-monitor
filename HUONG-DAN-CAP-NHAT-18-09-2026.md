@@ -1,13 +1,14 @@
 # Cập nhật WE Academic Monitor — 18/09/2026
 
-Gói này dùng cho repository GitHub và Cloudflare Workers/D1 đang hoạt động của bạn. Các bước dưới đây áp dụng cho bản cập nhật mới nhất; các hướng dẫn ngày 15–17/09 được giữ để tham khảo lịch sử.
+Gói này dùng để cập nhật repository GitHub và Cloudflare Workers/D1 đang hoạt động. Bản cập nhật giữ các chức năng trước đó, đồng thời bổ sung ngân hàng Freestyle theo từng Unit và đổi lịch sử học viên thành cửa sổ cuốn chiếu 48 tuần.
 
-## Những thay đổi trong bản này
+## Nội dung của bản cập nhật
 
-1. **Flyers:** cập nhật 12 Unit theo PDF mới, chia Vocabulary thành **ADJ, NOUN, VERB, ADV, PREPOSITION**, cùng cách hiển thị với Movers. Nhóm không có từ vẫn được hiển thị.
-2. **Bỏ điểm tổng:** không còn các số như `2/5`, `2.03/5`, `3.25/5` trên phiếu kiểm tra, danh sách và báo cáo. Giữ các tiêu chí chi tiết như Pattern/Freestyle theo %, Vocabulary theo số từ đúng, CLEAR/UNCLEAR và ĐÚNG/SAI. Nhãn Good/Average/Redflag giữ nguyên quy tắc hiện tại. Không xóa số liệu lịch sử trong D1.
-3. **Đánh giá giáo viên:** thay phiếu chấm điểm bằng **Class Observation Form** theo file bạn cung cấp, có Date, Time, Class, Teacher/TA; mỗi tiêu chí có ô chọn và Note. Có thể xem lại, tìm và sửa/xóa từng phiếu tại trang Đánh giá giáo viên hoặc Báo cáo → Giáo viên. Người ghi nhận được lấy từ tài khoản đăng nhập.
-4. **Theo dõi 48 tuần:** tab riêng theo lớp và học viên; lưu mốc bắt đầu riêng cho mỗi học viên; xem kết quả theo từng tuần, mở nhận xét và tiêu chí, thêm hoặc sửa lần kiểm tra.
+1. **Flyers:** 12 Unit có Vocabulary chia thành ADJ, NOUN, VERB, ADV và PREPOSITION, giống Movers.
+2. **Freestyle trong Khung chương trình:** mỗi Unit Starters, Movers và Flyers hiển thị một ngân hàng câu hỏi riêng. Academic Manager/Leader có thể mở Unit, nhập mỗi câu trên một dòng và lưu; cần ít nhất 5 câu. Phiếu kiểm tra chọn ngẫu nhiên đúng 5 câu từ ngân hàng của Unit đang mở và có nút đổi 5 câu.
+3. **Bỏ điểm tổng dạng /5:** không còn các số như `2/5`, `2.03/5` hoặc `3.25/5` trên giao diện. Các tiêu chí chi tiết và nhãn Good/Average/Redflag vẫn giữ nguyên.
+4. **Class Observation:** đánh giá giáo viên/TA bằng 7 tiêu chí Academic/Attitude, ô chọn và ghi chú; không dùng thang điểm.
+5. **Theo dõi cuốn chiếu 48 tuần:** luôn giữ tuần hiện tại và 47 tuần trước đó. Khi sang tuần mới, kết quả cũ hơn ngày bắt đầu của cửa sổ được xóa vĩnh viễn khỏi D1.
 
 | Academic | Attitude |
 | --- | --- |
@@ -16,54 +17,66 @@ Gói này dùng cho repository GitHub và Cloudflare Workers/D1 đang hoạt đ�
 | Student Engagement | Professional Behaviour |
 | Learning in Progress | |
 
-Mẫu Observation không có thang điểm. Website lưu nguyên ô chọn và ghi chú, không tự hiểu ô chưa chọn là đạt hay chưa đạt. Các phiếu đánh giá giáo viên trước đây vẫn nằm trong phần lịch sử của Báo cáo.
+## Cảnh báo trước khi cập nhật
 
-## Bước 1 — Sao lưu dữ liệu đang dùng
+Việc xóa lịch sử quá hạn là chủ đích của bản này. Migration không xóa dữ liệu ngay, nhưng sau khi Worker mới được triển khai, lần đầu một người dùng đã đăng nhập tải dashboard hoặc tab **Theo dõi 48 tuần** sẽ bắt đầu dọn dữ liệu quá hạn.
 
-Tại thư mục repository trên máy tính, mở Terminal / PowerShell và chạy:
+Hệ thống xóa:
+
+- Kết quả kiểm tra trong `learning_checks` có ngày trước cửa sổ 48 tuần.
+- Đánh giá học viên kiểu cũ trong `student_assessments` có ngày trước cửa sổ; chi tiết liên quan được xóa theo quan hệ dữ liệu.
+- Lịch kiểm tra đã hoàn thành trước cửa sổ.
+
+Hệ thống không xóa học viên, lớp, tài khoản, Observation, đánh giá giáo viên, khung chương trình hoặc lịch kiểm tra cũ vẫn đang ở trạng thái chờ.
+
+Ví dụ vào ngày 18/09/2026, tuần hiện tại là 14–20/09/2026. Cửa sổ giữ lại là **20/10/2025–20/09/2026**; kết quả trước 20/10/2025 bị xóa. Mốc này tự dịch thêm một tuần vào mỗi thứ Hai theo múi giờ Việt Nam.
+
+## Bước 1 — Bắt buộc sao lưu D1
+
+Tại thư mục repository trên máy tính, mở Terminal/PowerShell:
 
 ```bash
 npx wrangler login
 npx wrangler d1 export we-academic-monitor-db --remote --config wrangler.jsonc --output=../backup-before-2026-09-18.sql
 ```
 
-Lưu file sao lưu ở máy riêng. **Không nhập lệnh `npx` vào D1 Console:** phần Queries ở Cloudflare chỉ nhận SQL. Đây là lệnh xuất dữ liệu theo [hướng dẫn Cloudflare D1](https://developers.cloudflare.com/d1/best-practices/import-export-data/).
+Giữ file SQL ở máy riêng. Không nhập lệnh `npx` vào phần **Queries** của D1 Console vì ô đó chỉ nhận câu lệnh SQL.
+
+Nếu lệnh export thất bại, dừng cập nhật và kiểm tra lại tài khoản Cloudflare, tên database và `database_id`. Không tiếp tục deploy trước khi có bản sao lưu nếu bạn cần giữ dữ liệu quá 48 tuần.
 
 ## Bước 2 — Cập nhật mã trên GitHub
 
 1. Giải nén `WE-Academic-Monitor-Update-SAFE-2026-09-18.zip`.
-2. Chép nội dung thư mục `WE-Academic-Monitor-Cloudflare` bên trong gói vào **đúng thư mục gốc repository hiện tại** — cùng nơi có `package.json`. Chọn ghi đè file trùng tên; không tạo thêm một thư mục lồng bên trong repository.
-3. **Giữ nguyên `wrangler.jsonc` đang có trên GitHub.** Gói SAFE cố ý không chứa file này để giữ Database ID thật. D1 binding phải tiếp tục là `DB`, tên database là `we-academic-monitor-db`, và `migrations_dir` là `drizzle`.
-4. Giữ thư mục `drizzle` cũ và thêm file `0005_strong_violations.sql` cùng metadata mới từ gói cập nhật. Không tạo database mới; không xóa bảng hoặc sửa migration cũ.
-5. Nếu dùng GitHub trên trình duyệt: mở đúng repository → **Add file → Upload files**, đưa các file/thư mục đã giải nén vào, rồi **Commit changes**. Nếu GitHub giới hạn số file mỗi lần, chia thành vài lượt tải lên.
+2. Chép nội dung thư mục `WE-Academic-Monitor-Cloudflare` vào đúng thư mục gốc repository hiện tại, cùng nơi có `package.json`.
+3. Chọn ghi đè file trùng tên, nhưng **giữ nguyên `wrangler.jsonc` đang có trên GitHub**. Gói SAFE không chứa file này để tránh thay Database ID thật.
+4. D1 binding phải là `DB`, tên database là `we-academic-monitor-db`, và `migrations_dir` là `drizzle`.
+5. Giữ toàn bộ migration cũ và thêm `0005_strong_violations.sql`, `0006_awesome_turbo.sql` cùng metadata mới. Không sửa/xóa migration đã chạy và không tạo database mới.
 
-Nếu dùng Git trên máy tính:
+Nếu dùng Git:
 
 ```bash
 git add .
-git commit -m "Update Flyers, classroom observation and 48-week tracking"
+git commit -m "Add per-unit Freestyle banks and rolling 48-week history"
 git push
 ```
 
 ## Bước 3 — Build và deploy Cloudflare
 
-Trong cấu hình Builds của Worker hiện tại, giữ:
+Trong Workers Builds:
 
 ```text
 Build command: npm run build
 Deploy command: npm run deploy
 ```
 
-Tham khảo [cấu hình Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
+`npm run deploy` áp dụng migration còn thiếu trước khi deploy Worker:
 
-`npm run deploy` của dự án sẽ áp dụng migration còn thiếu rồi chạy `wrangler deploy`. Migration mới **chỉ tạo hai bảng**:
+- `0005_strong_violations.sql` tạo bảng Observation và bảng mốc theo dõi cũ.
+- `0006_awesome_turbo.sql` thêm cột `freestyle_questions` vào `curriculum_overrides`.
 
-- `teacher_observations`: phiếu dự giờ mới và ghi chú.
-- `student_tracking`: ngày bắt đầu theo dõi của từng học viên.
+Hai migration đều chỉ bổ sung cấu trúc, không xóa dữ liệu. Bảng mốc theo dõi cũ được giữ để tương thích nhưng giao diện mới không còn cho đặt mốc thủ công.
 
-Nó không xóa/sửa học viên, lớp, tài khoản, kết quả học viên hoặc phiếu giáo viên cũ. Wrangler ghi nhận các migration đã áp dụng và chỉ chạy phần còn thiếu; xem [cơ chế migration D1](https://developers.cloudflare.com/d1/reference/migrations/).
-
-Nếu thao tác từ máy tính thay vì Workers Builds:
+Nếu deploy từ máy tính:
 
 ```bash
 npm ci
@@ -71,57 +84,48 @@ npm run build
 npm run deploy
 ```
 
-## Bước 4 — Kiểm tra và sử dụng
+## Bước 4 — Kiểm tra sau deploy
 
-### Flyers
+### Ngân hàng Freestyle
 
-Mở **Khung chương trình → Flyers**, kiểm tra Vocabulary của từng Unit đã có 5 nhóm. Sau đó mở phiếu kiểm tra của một học viên Flyers để đối chiếu.
+1. Mở **Khung chương trình → Starters/Movers/Flyers**.
+2. Mở một Unit và kiểm tra mục **Freestyle question bank**.
+3. Bấm sửa Unit, nhập mỗi câu trên một dòng; không nhập dòng trùng và cần ít nhất 5 câu.
+4. Lưu, sau đó mở phiếu kiểm tra đúng Unit. Xác nhận phiếu hiện 5 câu lấy từ ngân hàng vừa lưu.
+5. Bấm **Đổi 5 câu** để lấy mẫu khác. Kết quả đã lưu vẫn giữ nguyên 5 câu đã dùng lúc kiểm tra, kể cả khi ngân hàng Unit được sửa sau đó.
 
-Nếu Unit từng được chỉnh sửa và lưu trên website, nội dung tự chỉnh vẫn được ưu tiên. Để cập nhật Vocabulary của Unit đó: **Chỉnh sửa → Nạp vocab Flyers mới → Lưu nội dung**. Thao tác này chỉ thay ô Vocabulary trong bản nháp, giữ các trường khác. Có thể chỉnh lại từ vựng trước khi lưu. Nút Khôi phục nội dung gốc là thao tác khác, thay cả Unit; chỉ dùng khi muốn khôi phục toàn bộ Unit.
-
-### Observation
-
-1. Vào **Đánh giá giáo viên**.
-2. Chọn ngày, giờ, lớp và Teacher/TA. Trợ giảng được thêm trong mục Giáo viên như các nhân sự khác, sau đó chọn vai trò TA trên phiếu.
-3. Tick và ghi chú cho các tiêu chí cần ghi nhận; phải có ít nhất một ô được chọn hoặc một ghi chú.
-4. Bấm **Lưu Observation**. Mở phiếu vừa lưu trong Lịch sử Observation để xem hoặc cập nhật.
-5. Vào **Báo cáo → Giáo viên** để xem tổng hợp. Phiếu cũ nằm riêng trong phần Đánh giá giáo viên trước đây.
+Unit từng được chỉnh sửa trước bản này sẽ tự dùng ngân hàng mặc định của chương trình cho đến khi bạn mở và lưu ngân hàng riêng của Unit. Nút **Khôi phục nội dung gốc** thay toàn bộ nội dung Unit, bao gồm cả ngân hàng Freestyle.
 
 ### Theo dõi 48 tuần
 
-1. Vào **Theo dõi 48 tuần**, chọn lớp và học viên.
-2. Lần đầu, hệ thống đề xuất tuần có kết quả đầu tiên; nếu chưa có kết quả thì dùng tuần hiện tại.
-3. Chọn ngày bắt đầu → **Xem khoảng này**. Ngày được đưa về thứ Hai của tuần đó.
-4. Bấm **Lưu mốc cho học viên** để lần mở sau, kể cả trên thiết bị khác, dùng cùng mốc.
-5. Mỗi dòng là một tuần từ thứ Hai đến Chủ nhật. Có nhãn Good/Average/Redflag nếu đã kiểm tra; tuần đã qua chưa có kết quả và tuần chưa đến được phân biệt.
-6. Mở tuần để xem các lần kiểm tra, tiêu chí và nhận xét. Bấm **Kiểm tra học viên** để thêm hoặc **Cập nhật kết quả** để sửa bản ghi đã có. Kiểm tra ngày đánh giá trên phiếu trước khi lưu, nhất là khi nhập bù cho tuần cũ.
-7. Nếu cùng tuần có nhiều lần kiểm tra, tất cả được giữ lại; nhãn tuần dùng lần có ngày mới nhất. Không tự ghi đè lần kiểm tra trước.
-8. Dùng **48 tuần trước / 48 tuần tiếp** để xem các khoảng khác. Chỉ khi bấm **Lưu mốc cho học viên** thì mốc dùng chung mới thay đổi.
+1. Mở **Theo dõi 48 tuần**, chọn lớp và học viên.
+2. Phạm vi ngày được tính tự động; không còn ô đặt hoặc lưu mốc bắt đầu.
+3. Tuần hiện tại nằm trên cùng, tiếp theo là 1 tuần trước đến 47 tuần trước.
+4. Mở một tuần để xem tất cả lần kiểm tra, tiêu chí và nhận xét.
+5. Dùng **Kiểm tra học viên** để nhập bù trong cửa sổ hoặc **Cập nhật kết quả** để sửa bản ghi hiện có.
+6. Hệ thống không cho lưu ngày trước 48 tuần hoặc sau Chủ nhật của tuần hiện tại.
 
-Kết quả lấy trực tiếp từ D1 theo học viên và khoảng ngày, không bị giới hạn bởi danh sách 300 lượt gần nhất ở trang tổng quan. **48 tuần là khoảng hiển thị, không phải thời hạn xóa dữ liệu.** Đổi lớp hay đổi mốc theo dõi không xóa lịch sử; thao tác xóa học viên vẫn xóa dữ liệu liên quan như chức năng hiện tại.
+Nếu một tuần có nhiều lượt kiểm tra, tất cả lượt trong cửa sổ vẫn được giữ. Tab lấy dữ liệu trực tiếp từ D1 theo học viên nên không bị giới hạn bởi 300 dòng gần nhất của dashboard.
 
-### Quyền và đăng nhập
+### Observation và quyền
 
-Admin, Academic Manager và Academic Leader đều được dùng Observation và Theo dõi 48 tuần. Riêng quản lý tài khoản vẫn chỉ dành cho Admin. Phiên đăng nhập vẫn là 30 ngày, hoặc kết thúc khi đăng xuất/hết hiệu lực.
+Admin, Academic Manager và Academic Leader đều có thể quản lý học vụ, kiểm tra học viên, dùng Observation và xem báo cáo. Quản lý tài khoản chỉ dành cho Admin. Phiên đăng nhập kéo dài tối đa 30 ngày, hoặc kết thúc sớm khi đăng xuất, tài khoản bị khóa hay phiên hết hiệu lực.
 
 ## Nếu gặp lỗi
 
-- **Database ID toàn số 0 / database not found:** sửa `database_id` trong `wrangler.jsonc` về ID thật của D1 hiện tại, không tạo D1 mới để thay thế dữ liệu cũ.
-- **`no such table: teacher_observations` hoặc `student_tracking`:** kiểm tra Deploy command là `npm run deploy`; xem log migration `0005`. Có thể chạy `npm run db:migrate:remote` trong Terminal tại repository đúng cấu hình rồi deploy lại.
-- **`table already exists` ở migration cũ:** giữ nguyên dữ liệu và gửi log để kiểm tra lịch sử migration; không DROP TABLE, không chạy lại file khởi tạo thủ công.
-- **Không thấy tab mới:** xác nhận lần deploy mới thành công, đúng commit và đúng Worker, rồi tải lại trang bằng Ctrl+F5.
+- **Database not found / ID toàn số 0:** thay `database_id` trong `wrangler.jsonc` bằng ID thật của D1 hiện tại. Không tạo D1 mới nếu muốn giữ dữ liệu.
+- **`no such table: teacher_observations`:** kiểm tra log migration `0005` và Deploy command `npm run deploy`.
+- **`no such column: freestyle_questions`:** kiểm tra migration `0006` đã được tải lên GitHub và được áp dụng.
+- **`table already exists`:** không DROP TABLE và không chạy lại migration khởi tạo thủ công; giữ dữ liệu rồi kiểm tra bảng `d1_migrations`.
+- **Không thấy thay đổi:** kiểm tra đúng commit/Worker, deploy thành công, rồi tải lại bằng Ctrl+F5.
 
 ## Kiểm thử bản cập nhật
 
-Các bài kiểm thử tự động nằm trong `tests/`, chạy bằng:
-
 ```bash
-node --experimental-strip-types --test tests/*.test.mjs
-npm run lint
+node --import tsx --test tests/*.test.mjs
 npx tsc --noEmit
+npm run lint
 npm run build
 ```
 
-Kiểm thử API dùng SQLite độc lập với bộ chuyển đổi D1 tại máy kiểm tra; không kết nối hoặc ghi vào D1 thật. Cần kiểm tra lại một phiếu Observation và một kết quả học viên sau khi bạn deploy lên tài khoản Cloudflare của mình.
-
-Kết quả kiểm tra ngày 18/09: 14 bài kiểm thử tự động đạt; ESLint, TypeScript và production build đạt; cả 6 migration chạy thành công trên D1 local mới; Wrangler deploy dry-run đạt. Chưa kiểm tra giao diện bằng trình duyệt hoặc triển khai lên Worker thật trong môi trường này.
+Kiểm thử API dùng SQLite độc lập, không kết nối hoặc ghi vào D1 thật. Bản này có 15 kiểm thử cho migration, quyền, Observation, Freestyle theo Unit và dọn lịch sử tuần thứ 49.
