@@ -19,11 +19,23 @@ import {
 import { curriculumDefaults, curriculumKey, programs } from "@/lib/curriculum";
 import { getCurrentUser } from "@/lib/auth";
 import { validDate } from "@/lib/weekly-history";
+import { isInStudentHistoryWindow, pruneExpiredStudentHistory } from "@/lib/history-retention";
 
 type ScoreItem = { criterionId: number; score: number; note?: string };
 
 const now = () => new Date().toISOString();
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+const questionList = (value: unknown) => Array.isArray(value)
+  ? Array.from(new Set(value.map(text).filter(Boolean))).slice(0, 200)
+  : [];
+const storedQuestionList = (value: string, fallback: string[]) => {
+  try {
+    const parsed = questionList(JSON.parse(value || "[]"));
+    return parsed.length >= 5 ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
 const id = (value: unknown) => {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -52,6 +64,7 @@ export async function GET(request: Request) {
     const currentUser = await getCurrentUser(request);
     if (!currentUser) return fail("Vui lòng đăng nhập để tiếp tục.", 401);
     const db = getDb();
+    await pruneExpiredStudentHistory(db);
     const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows, levelRows, feedbackRows, queueRows, observationRows] =
       await Promise.all([
         db
@@ -202,6 +215,7 @@ export async function GET(request: Request) {
             content: override.content,
             vocabulary: override.vocabulary,
             grammar: override.grammar,
+            freestyleQuestions: storedQuestionList(override.freestyleQuestions, unit.freestyleQuestions),
             vocabularyMax: override.vocabularyMax,
             writingRef: override.writingRef,
             isOverride: true,
@@ -317,6 +331,13 @@ export async function POST(request: Request) {
         (unit) => unit.programCode === programCode && unit.unitNumber === unitNumber
       );
       if (!sourceUnit || !unitNumber) return fail("Nội dung chương trình không hợp lệ.");
+      const freestyleQuestions = questionList(body.freestyleQuestions);
+      if (sourceUnit.group === "cambridge" && freestyleQuestions.length < 5) {
+        return fail("Mỗi Unit Starters, Movers hoặc Flyers cần ít nhất 5 câu Freestyle.");
+      }
+      if (freestyleQuestions.some((question) => question.length > 500)) {
+        return fail("Mỗi câu Freestyle được nhập tối đa 500 ký tự.");
+      }
       const values = {
         programCode,
         unitNumber,
@@ -324,6 +345,7 @@ export async function POST(request: Request) {
         content: text(body.content),
         vocabulary: text(body.vocabulary),
         grammar: text(body.grammar),
+        freestyleQuestions: JSON.stringify(sourceUnit.group === "cambridge" ? freestyleQuestions : []),
         vocabularyMax: Math.max(0, Number(body.vocabularyMax) || 0),
         writingRef: text(body.writingRef),
         updatedAt: now(),
@@ -434,6 +456,9 @@ export async function POST(request: Request) {
       if (!studentId || !programCode || !unitNumber || !validDate(checkedAt)) {
         return fail("Vui lòng chọn học viên, nội dung kiểm tra và ngày đánh giá.");
       }
+      if (!isInStudentHistoryWindow(checkedAt)) {
+        return fail("Chỉ có thể lưu kết quả trong tuần hiện tại và 47 tuần trước.");
+      }
       if (action === "updateLearningCheck" && !checkId) return fail("Bản đánh giá không hợp lệ.");
 
       let existingCheck: { studentId: number; programLabel: string } | undefined;
@@ -508,6 +533,14 @@ export async function POST(request: Request) {
         if (!["correct", "incorrect"].includes(oneOrMany) || !["correct", "incorrect"].includes(amIsAre)) {
           return fail("Vui lòng đánh giá đủ One or Many và Am – is – are.");
         }
+        const freestyleQuestions = questionList(evaluation.freestyleQuestions);
+        if (freestyleQuestions.length !== 5) {
+          return fail("Mỗi lần kiểm tra cần đúng 5 câu Freestyle từ ngân hàng của Unit.");
+        }
+        if (freestyleQuestions.some((question) => question.length > 500)) {
+          return fail("Mỗi câu Freestyle không được dài quá 500 ký tự.");
+        }
+        evaluation.freestyleQuestions = freestyleQuestions;
         const patternPercent = clampPercent(evaluation.patternPercent);
         const freestylePercent = clampPercent(evaluation.freestylePercent);
         componentPercentages = [patternPercent, freestylePercent];
@@ -725,6 +758,9 @@ export async function POST(request: Request) {
       const items = Array.isArray(body.items) ? (body.items as ScoreItem[]) : [];
       if (!studentId || !validDate(checkedAt) || !items.length) {
         return fail("Vui lòng chọn học viên, ngày kiểm tra và chấm đủ tiêu chí.");
+      }
+      if (!isInStudentHistoryWindow(checkedAt)) {
+        return fail("Chỉ có thể lưu kết quả trong tuần hiện tại và 47 tuần trước.");
       }
       const criterionIds = items.map((item) => id(item.criterionId)).filter((value): value is number => Boolean(value));
       const criterionRows = await db.select({ id: criteria.id, weight: criteria.weight }).from(criteria).where(and(eq(criteria.targetType, "student"), inArray(criteria.id, criterionIds)));

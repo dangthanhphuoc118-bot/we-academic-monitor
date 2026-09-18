@@ -1,3 +1,5 @@
+import { speakingQuestions, type SpeakingProgramCode } from "./speaking-questions";
+
 export type ProgramGroup = "baby" | "super" | "cambridge";
 
 export type ProgramDefinition = {
@@ -20,6 +22,7 @@ export type CurriculumUnit = {
   content: string;
   vocabulary: string;
   grammar: string;
+  freestyleQuestions: string[];
   vocabularyMax: number;
   writingRef: string;
   dayStart: number;
@@ -76,16 +79,22 @@ export const programs: ProgramDefinition[] = [
   { code: "FLYERS", label: "Flyers", series: "Cambridge Young Learners", group: "cambridge", lessons: 36, color: "green" },
 ];
 
-type SourceUnit = Omit<CurriculumUnit, "programCode" | "programLabel" | "series" | "group" | "unitLabel" | "dayStart" | "dayEnd"> & {
+type SourceUnit = Omit<CurriculumUnit, "programCode" | "programLabel" | "series" | "group" | "unitLabel" | "dayStart" | "dayEnd" | "freestyleQuestions"> & {
   unitLabel?: string;
   dayStart?: number;
   dayEnd?: number;
+  freestyleQuestions?: string[];
 };
 
 function units(programCode: string, source: SourceUnit[]): CurriculumUnit[] {
   const program = programs.find((item) => item.code === programCode)!;
   return source.map((item) => ({
     ...item,
+    freestyleQuestions: item.freestyleQuestions
+      ? [...item.freestyleQuestions]
+      : program.group === "cambridge"
+        ? [...(speakingQuestions[programCode as SpeakingProgramCode] || [])]
+        : [],
     programCode,
     programLabel: program.label,
     series: program.series,

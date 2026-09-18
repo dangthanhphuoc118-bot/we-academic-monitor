@@ -185,6 +185,7 @@ export const curriculumOverrides = sqliteTable(
     content: text("content").notNull().default(""),
     vocabulary: text("vocabulary").notNull().default(""),
     grammar: text("grammar").notNull().default(""),
+    freestyleQuestions: text("freestyle_questions").notNull().default("[]"),
     vocabularyMax: integer("vocabulary_max").notNull().default(0),
     writingRef: text("writing_ref").notNull().default(""),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),

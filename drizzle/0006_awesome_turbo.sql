@@ -1,0 +1,1 @@
+ALTER TABLE `curriculum_overrides` ADD `freestyle_questions` text DEFAULT '[]' NOT NULL;
