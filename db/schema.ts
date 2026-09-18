@@ -355,3 +355,24 @@ export const authLoginAttempts = sqliteTable(
     ),
   ]
 );
+
+export const teacherObservations = sqliteTable("teacher_observations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teacherId: integer("teacher_id").references(() => teachers.id, { onDelete: "set null" }),
+  teacherName: text("teacher_name").notNull(),
+  teacherRole: text("teacher_role").notNull().default("teacher"),
+  classId: integer("class_id").references(() => classes.id, { onDelete: "set null" }),
+  className: text("class_name").notNull(),
+  observerName: text("observer_name").notNull(),
+  observedAt: text("observed_at").notNull(),
+  observedTime: text("observed_time").notNull(),
+  itemsJson: text("items_json").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("idx_teacher_observations_date").on(table.observedAt), index("idx_teacher_observations_teacher_date").on(table.teacherId, table.observedAt)]);
+
+export const studentTracking = sqliteTable("student_tracking", {
+  studentId: integer("student_id").primaryKey().references(() => students.id, { onDelete: "cascade" }),
+  startDate: text("start_date").notNull(),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

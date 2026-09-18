@@ -13,10 +13,12 @@ import {
   studentFeedbackOptions,
   teacherReviewItems,
   teacherReviews,
+  teacherObservations,
   teachers,
 } from "@/db/schema";
 import { curriculumDefaults, curriculumKey, programs } from "@/lib/curriculum";
 import { getCurrentUser } from "@/lib/auth";
+import { validDate } from "@/lib/weekly-history";
 
 type ScoreItem = { criterionId: number; score: number; note?: string };
 
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
     const currentUser = await getCurrentUser(request);
     if (!currentUser) return fail("Vui lòng đăng nhập để tiếp tục.", 401);
     const db = getDb();
-    const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows, levelRows, feedbackRows, queueRows] =
+    const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows, levelRows, feedbackRows, queueRows, observationRows] =
       await Promise.all([
         db
           .select({
@@ -180,6 +182,7 @@ export async function GET(request: Request) {
           .leftJoin(classes, eq(studentCheckQueue.classId, classes.id))
           .orderBy(desc(studentCheckQueue.scheduledDate), asc(classes.name), asc(students.name))
           .limit(500),
+        db.select().from(teacherObservations).orderBy(desc(teacherObservations.observedAt), desc(teacherObservations.observedTime), desc(teacherObservations.id)),
       ]);
 
     const overrides = new Map(
@@ -217,6 +220,7 @@ export async function GET(request: Request) {
       criteria: criterionRows,
       studentAssessments: assessmentRows,
       teacherReviews: reviewRows,
+      teacherObservations: observationRows,
       curriculum,
       learningChecks: learningCheckRows,
       levelOptions: levelRows,
@@ -427,7 +431,7 @@ export async function POST(request: Request) {
       const feedback = Array.isArray(body.feedback)
         ? body.feedback.map(text).filter(Boolean).slice(0, 30)
         : [];
-      if (!studentId || !programCode || !unitNumber || !checkedAt) {
+      if (!studentId || !programCode || !unitNumber || !validDate(checkedAt)) {
         return fail("Vui lòng chọn học viên, nội dung kiểm tra và ngày đánh giá.");
       }
       if (action === "updateLearningCheck" && !checkId) return fail("Bản đánh giá không hợp lệ.");
@@ -719,7 +723,7 @@ export async function POST(request: Request) {
       const studentId = id(body.studentId);
       const checkedAt = text(body.checkedAt);
       const items = Array.isArray(body.items) ? (body.items as ScoreItem[]) : [];
-      if (!studentId || !checkedAt || !items.length) {
+      if (!studentId || !validDate(checkedAt) || !items.length) {
         return fail("Vui lòng chọn học viên, ngày kiểm tra và chấm đủ tiêu chí.");
       }
       const criterionIds = items.map((item) => id(item.criterionId)).filter((value): value is number => Boolean(value));
