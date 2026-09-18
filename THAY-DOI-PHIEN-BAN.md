@@ -1,3 +1,17 @@
+# Thay đổi phiên bản ngày 18/09/2026
+
+- Cập nhật toàn bộ 12 Unit Flyers từ PDF mới; Vocabulary chia 5 nhóm ADJ, NOUN, VERB, ADV, PREPOSITION như Movers.
+- Thêm nút nạp Vocabulary Flyers mới trong trình chỉnh sửa Unit, giữ các trường tự chỉnh khác.
+- Bỏ điểm tổng dạng `/5` và thanh tiến độ tổng trên các phiếu/báo cáo; giữ tiêu chí chi tiết và phân loại kết quả.
+- Phiếu giáo viên chuyển sang Classroom Observation theo PDF: Date, Time, Class, Teacher/TA; 4 tiêu chí Academic và 3 tiêu chí Attitude, mỗi tiêu chí có checkbox và Note.
+- Observation được lưu trong D1, có tìm kiếm, xem chi tiết, cập nhật, xóa và xuất hiện trong Báo cáo giáo viên. Không quy đổi ô chọn thành điểm.
+- Thêm tab Theo dõi 48 tuần theo học viên; lưu mốc thứ Hai, giữ tất cả kết quả trong từng tuần, hỗ trợ kiểm tra bổ sung và cập nhật từ lịch sử.
+- Endpoint lịch sử đọc đủ 48 tuần theo từng học viên, gồm cả đánh giá cũ và không áp giới hạn 300 bản ghi của tổng quan.
+- Migration `0005_strong_violations.sql` chỉ tạo thêm hai bảng, không sửa/xóa dữ liệu cũ. Session vẫn 30 ngày, Manager và Leader vẫn có quyền học vụ ngang nhau.
+- Chi tiết triển khai: `HUONG-DAN-CAP-NHAT-18-09-2026.md`.
+
+---
+
 # Thay đổi phiên bản ngày 17/09/2026
 
 ## Nội dung cập nhật mới

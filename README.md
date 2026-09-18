@@ -11,10 +11,12 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Mở phiếu kiểm tra trực tiếp từ từng học viên trong danh sách lớp.
 - Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp; lớp không còn gắn cứng với một trình độ.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
-- Khung Movers mới hiển thị riêng 5 nhóm ADJ, NOUN, VERB, ADV và PREPOSITION.
+- Khung Movers và Flyers hiển thị riêng 5 nhóm ADJ, NOUN, VERB, ADV và PREPOSITION.
 - Bộ câu hỏi Freestyle cho Starters, Movers và Flyers tự chọn ngẫu nhiên đúng 5 câu và có nút đổi câu.
 - Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
-- Đánh giá giáo viên.
+- Đánh giá giáo viên theo Classroom Observation: 7 tiêu chí Academic/Attitude, ô chọn và ghi chú; lưu, xem, sửa/xóa từng phiếu.
+- Tab Theo dõi 48 tuần: chọn lớp/học viên, lưu mốc bắt đầu, đọc toàn bộ kết quả và nhận xét theo tuần từ D1.
+- Không hiển thị điểm tổng dạng `/5`; giữ các tiêu chí chi tiết và nhãn Good/Average/Redflag.
 - Báo cáo học viên theo ba vùng Good, Average và Redflag, hiển thị chi tiết Evaluation Criteria, biểu đồ so sánh và lịch sử kiểm tra.
 - Cập nhật lại kết quả vừa lưu hoặc kết quả cũ trên đúng bản ghi, không tạo bản trùng.
 - Quy tắc Good/Average/Redflag riêng cho Baby Stars, Super Kids và Starters/Movers/Flyers.
@@ -33,6 +35,8 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Binding D1 bắt buộc giữ là `DB`.
 
 ## Hướng dẫn nhanh
+
+**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật ngày 18/09/2026](HUONG-DAN-CAP-NHAT-18-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
 
 Toàn bộ hướng dẫn từng bước nằm trong file [HUONG-DAN-SETUP.md](HUONG-DAN-SETUP.md).
 
@@ -55,6 +59,7 @@ npm run deploy
 - Migration `0002_grey_sentinels.sql` chỉ bổ sung cấu hình và nhận xét; không xóa dữ liệu học viên hiện có.
 - Migration `0003_dazzling_susan_delgado.sql` chỉ tạo các bảng đăng nhập; không sửa hoặc xóa dữ liệu học vụ hiện có.
 - Migration `0004_rich_masked_marvel.sql` chỉ tạo bảng danh sách chờ kiểm tra; không sửa hoặc xóa dữ liệu học vụ hiện có.
+- Migration `0005_strong_violations.sql` chỉ tạo bảng Observation và mốc theo dõi 48 tuần; giữ nguyên mọi dữ liệu cũ.
 - Trước mỗi thay đổi lớn, xuất bản sao D1 theo hướng dẫn trong `HUONG-DAN-SETUP.md`.
 
 ## Bảo mật
