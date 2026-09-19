@@ -1,9 +1,11 @@
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
+  classTeachers,
   classes,
   criteria,
   curriculumOverrides,
+  freestyleBanks,
   levelOptions,
   learningChecks,
   studentCheckQueue,
@@ -20,6 +22,13 @@ import { curriculumDefaults, curriculumKey, programs } from "@/lib/curriculum";
 import { getCurrentUser } from "@/lib/auth";
 import { validDate } from "@/lib/weekly-history";
 import { isInStudentHistoryWindow, pruneExpiredStudentHistory } from "@/lib/history-retention";
+import {
+  defaultFreestyleBanks,
+  flattenFreestyleCategories,
+  normalizeFreestyleCategories,
+  type FreestyleQuestionCategory,
+  type SpeakingProgramCode,
+} from "@/lib/speaking-questions";
 
 type ScoreItem = { criterionId: number; score: number; note?: string };
 
@@ -28,10 +37,9 @@ const text = (value: unknown) => (typeof value === "string" ? value.trim() : "")
 const questionList = (value: unknown) => Array.isArray(value)
   ? Array.from(new Set(value.map(text).filter(Boolean))).slice(0, 200)
   : [];
-const storedQuestionList = (value: string, fallback: string[]) => {
+const storedFreestyleCategories = (value: string, fallback: FreestyleQuestionCategory[]) => {
   try {
-    const parsed = questionList(JSON.parse(value || "[]"));
-    return parsed.length >= 5 ? parsed : fallback;
+    return normalizeFreestyleCategories(JSON.parse(value || "[]"));
   } catch {
     return fallback;
   }
@@ -40,6 +48,9 @@ const id = (value: unknown) => {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
+const idList = (value: unknown) => Array.isArray(value)
+  ? Array.from(new Set(value.map(id).filter((item): item is number => item !== null))).slice(0, 100)
+  : [];
 
 function fail(message: string, status = 400) {
   return Response.json({ error: message }, { status });
@@ -65,7 +76,7 @@ export async function GET(request: Request) {
     if (!currentUser) return fail("Vui lòng đăng nhập để tiếp tục.", 401);
     const db = getDb();
     await pruneExpiredStudentHistory(db);
-    const [classRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, learningCheckRows, levelRows, feedbackRows, queueRows, observationRows] =
+    const [classRows, classTeacherRows, studentRows, teacherRows, criterionRows, assessmentRows, reviewRows, overrideRows, freestyleBankRows, learningCheckRows, levelRows, feedbackRows, queueRows, observationRows] =
       await Promise.all([
         db
           .select({
@@ -84,6 +95,15 @@ export async function GET(request: Request) {
           .leftJoin(students, eq(students.classId, classes.id))
           .groupBy(classes.id)
           .orderBy(asc(classes.name)),
+        db
+          .select({
+            classId: classTeachers.classId,
+            teacherId: classTeachers.teacherId,
+            teacherName: teachers.name,
+          })
+          .from(classTeachers)
+          .innerJoin(teachers, eq(classTeachers.teacherId, teachers.id))
+          .orderBy(asc(teachers.name), asc(classTeachers.teacherId)),
         db
           .select({
             id: students.id,
@@ -107,10 +127,10 @@ export async function GET(request: Request) {
             specialization: teachers.specialization,
             status: teachers.status,
             note: teachers.note,
-            classCount: count(classes.id),
+            classCount: count(classTeachers.classId),
           })
           .from(teachers)
-          .leftJoin(classes, eq(classes.teacherId, teachers.id))
+          .leftJoin(classTeachers, eq(classTeachers.teacherId, teachers.id))
           .groupBy(teachers.id)
           .orderBy(asc(teachers.name)),
         db.select().from(criteria).orderBy(asc(criteria.targetType), asc(criteria.sortOrder), asc(criteria.id)),
@@ -150,6 +170,7 @@ export async function GET(request: Request) {
           .orderBy(desc(teacherReviews.observedAt), desc(teacherReviews.id))
           .limit(200),
         db.select().from(curriculumOverrides),
+        db.select().from(freestyleBanks),
         db
           .select({
             id: learningChecks.id,
@@ -215,7 +236,6 @@ export async function GET(request: Request) {
             content: override.content,
             vocabulary: override.vocabulary,
             grammar: override.grammar,
-            freestyleQuestions: storedQuestionList(override.freestyleQuestions, unit.freestyleQuestions),
             vocabularyMax: override.vocabularyMax,
             writingRef: override.writingRef,
             isOverride: true,
@@ -227,8 +247,36 @@ export async function GET(request: Request) {
       };
     });
 
+    const assignmentsByClass = new Map<number, { teacherId: number; teacherName: string }[]>();
+    for (const assignment of classTeacherRows) {
+      const current = assignmentsByClass.get(assignment.classId) || [];
+      current.push({ teacherId: assignment.teacherId, teacherName: assignment.teacherName });
+      assignmentsByClass.set(assignment.classId, current);
+    }
+
+    const freestyleBankByProgram = new Map(
+      freestyleBankRows.map((row) => [row.programCode, row])
+    );
+    const cambridgePrograms = programs.filter((program) => program.group === "cambridge");
+
     return Response.json({
-      classes: classRows.map((row) => ({ ...row, studentCount: Number(row.studentCount) })),
+      classes: classRows.map((row) => {
+        const assignments = assignmentsByClass.get(row.id) || [];
+        const teacherIds = assignments.length
+          ? assignments.map((assignment) => assignment.teacherId)
+          : row.teacherId ? [row.teacherId] : [];
+        const teacherNames = assignments.length
+          ? assignments.map((assignment) => assignment.teacherName)
+          : row.teacherName ? [row.teacherName] : [];
+        return {
+          ...row,
+          teacherId: assignments[0]?.teacherId ?? row.teacherId,
+          teacherName: assignments[0]?.teacherName ?? row.teacherName,
+          teacherIds,
+          teacherNames,
+          studentCount: Number(row.studentCount),
+        };
+      }),
       students: studentRows,
       teachers: teacherRows.map((row) => ({ ...row, classCount: Number(row.classCount) })),
       criteria: criterionRows,
@@ -236,6 +284,18 @@ export async function GET(request: Request) {
       teacherReviews: reviewRows,
       teacherObservations: observationRows,
       curriculum,
+      freestyleBanks: cambridgePrograms.map((program) => {
+        const stored = freestyleBankByProgram.get(program.code);
+        const programCode = program.code as SpeakingProgramCode;
+        return {
+          programCode,
+          programLabel: programLabels.get(programCode) || program.label,
+          categories: stored
+            ? storedFreestyleCategories(stored.categoriesJson, defaultFreestyleBanks[programCode])
+            : defaultFreestyleBanks[programCode],
+          updatedAt: stored?.updatedAt || null,
+        };
+      }),
       learningChecks: learningCheckRows,
       levelOptions: levelRows,
       feedbackOptions: feedbackRows,
@@ -324,6 +384,46 @@ export async function POST(request: Request) {
       return Response.json({ ok: true });
     }
 
+    if (action === "updateFreestyleBank") {
+      const programCode = text(body.programCode) as SpeakingProgramCode;
+      const program = programs.find((item) => item.code === programCode && item.group === "cambridge");
+      if (!program || !Array.isArray(body.categories)) {
+        return fail("Ngân hàng Freestyle không hợp lệ.");
+      }
+      if (body.categories.length > 50) {
+        return fail("Mỗi level được tạo tối đa 50 nhóm câu hỏi Freestyle.");
+      }
+      const rawCategories = body.categories as unknown[];
+      for (const item of rawCategories) {
+        if (!item || typeof item !== "object") return fail("Nhóm câu hỏi Freestyle không hợp lệ.");
+        const category = item as Record<string, unknown>;
+        if (text(category.category).length > 100) return fail("Tên nhóm Freestyle tối đa 100 ký tự.");
+        for (const key of ["yesNoQuestions", "whQuestions"] as const) {
+          if (!Array.isArray(category[key])) return fail("Danh sách câu hỏi Freestyle không hợp lệ.");
+          if (category[key].some((question) => typeof question !== "string" || question.trim().length > 500)) {
+            return fail("Mỗi câu Freestyle được nhập tối đa 500 ký tự.");
+          }
+        }
+      }
+      const categories = normalizeFreestyleCategories(rawCategories);
+      if (flattenFreestyleCategories(categories).length > 500) {
+        return fail("Mỗi level được lưu tối đa 500 câu Freestyle.");
+      }
+      const values = {
+        programCode,
+        categoriesJson: JSON.stringify(categories),
+        updatedAt: now(),
+      };
+      const [row] = await db
+        .insert(freestyleBanks)
+        .values(values)
+        .onConflictDoUpdate({ target: freestyleBanks.programCode, set: values })
+        .returning();
+      return Response.json({
+        item: { ...row, programLabel: program.label, categories },
+      });
+    }
+
     if (action === "updateCurriculumUnit") {
       const programCode = text(body.programCode);
       const unitNumber = id(body.unitNumber);
@@ -331,13 +431,6 @@ export async function POST(request: Request) {
         (unit) => unit.programCode === programCode && unit.unitNumber === unitNumber
       );
       if (!sourceUnit || !unitNumber) return fail("Nội dung chương trình không hợp lệ.");
-      const freestyleQuestions = questionList(body.freestyleQuestions);
-      if (sourceUnit.group === "cambridge" && freestyleQuestions.length < 5) {
-        return fail("Mỗi Unit Starters, Movers hoặc Flyers cần ít nhất 5 câu Freestyle.");
-      }
-      if (freestyleQuestions.some((question) => question.length > 500)) {
-        return fail("Mỗi câu Freestyle được nhập tối đa 500 ký tự.");
-      }
       const values = {
         programCode,
         unitNumber,
@@ -345,7 +438,7 @@ export async function POST(request: Request) {
         content: text(body.content),
         vocabulary: text(body.vocabulary),
         grammar: text(body.grammar),
-        freestyleQuestions: JSON.stringify(sourceUnit.group === "cambridge" ? freestyleQuestions : []),
+        freestyleQuestions: "[]",
         vocabularyMax: Math.max(0, Number(body.vocabularyMax) || 0),
         writingRef: text(body.writingRef),
         updatedAt: now(),
@@ -535,10 +628,29 @@ export async function POST(request: Request) {
         }
         const freestyleQuestions = questionList(evaluation.freestyleQuestions);
         if (freestyleQuestions.length !== 5) {
-          return fail("Mỗi lần kiểm tra cần đúng 5 câu Freestyle từ ngân hàng của Unit.");
+          return fail("Mỗi lần kiểm tra cần đúng 5 câu Freestyle từ ngân hàng của level.");
         }
         if (freestyleQuestions.some((question) => question.length > 500)) {
           return fail("Mỗi câu Freestyle không được dài quá 500 ký tự.");
+        }
+        if (action === "createLearningCheck") {
+          const [storedBank] = await db
+            .select()
+            .from(freestyleBanks)
+            .where(eq(freestyleBanks.programCode, programCode))
+            .limit(1);
+          const speakingProgramCode = programCode as SpeakingProgramCode;
+          const categories = storedBank
+            ? storedFreestyleCategories(storedBank.categoriesJson, defaultFreestyleBanks[speakingProgramCode])
+            : defaultFreestyleBanks[speakingProgramCode];
+          const bankQuestions = flattenFreestyleCategories(categories);
+          if (bankQuestions.length < 5) {
+            return fail(`Ngân hàng Freestyle của level ${program.label} cần ít nhất 5 câu trước khi kiểm tra.`);
+          }
+          const availableQuestions = new Set(bankQuestions);
+          if (freestyleQuestions.some((question) => !availableQuestions.has(question))) {
+            return fail(`Có câu Freestyle không còn thuộc ngân hàng của level ${program.label}. Vui lòng chọn lại 5 câu.`);
+          }
         }
         evaluation.freestyleQuestions = freestyleQuestions;
         const patternPercent = clampPercent(evaluation.patternPercent);
@@ -607,22 +719,41 @@ export async function POST(request: Request) {
     if (action === "createClass" || action === "updateClass") {
       const name = text(body.name);
       if (!name) return fail("Vui lòng nhập tên lớp.");
+      const legacyTeacherId = id(body.teacherId);
+      const teacherIds = Array.isArray(body.teacherIds)
+        ? idList(body.teacherIds)
+        : legacyTeacherId ? [legacyTeacherId] : [];
+      if (teacherIds.length) {
+        const existingTeachers = await db.select({ id: teachers.id }).from(teachers).where(inArray(teachers.id, teacherIds));
+        if (existingTeachers.length !== teacherIds.length) {
+          return fail("Danh sách giáo viên có người không còn tồn tại. Vui lòng chọn lại.");
+        }
+      }
       const values = {
         name,
         schedule: text(body.schedule),
         room: text(body.room),
-        teacherId: id(body.teacherId),
+        // Keep the first assignment in the legacy column for backward compatibility.
+        teacherId: teacherIds[0] || null,
         status: text(body.status) || "active",
         updatedAt: now(),
       };
       if (action === "createClass") {
         const [row] = await db.insert(classes).values({ ...values, level: "" }).returning();
-        return Response.json({ item: row }, { status: 201 });
+        if (teacherIds.length) {
+          await db.insert(classTeachers).values(teacherIds.map((teacherId) => ({ classId: row.id, teacherId })));
+        }
+        return Response.json({ item: { ...row, teacherIds } }, { status: 201 });
       }
       const itemId = id(body.id);
       if (!itemId) return fail("Lớp không hợp lệ.");
       const [row] = await db.update(classes).set(values).where(eq(classes.id, itemId)).returning();
-      return Response.json({ item: row });
+      if (!row) return fail("Không tìm thấy lớp cần cập nhật.", 404);
+      await db.delete(classTeachers).where(eq(classTeachers.classId, itemId));
+      if (teacherIds.length) {
+        await db.insert(classTeachers).values(teacherIds.map((teacherId) => ({ classId: itemId, teacherId })));
+      }
+      return Response.json({ item: { ...row, teacherIds } });
     }
 
     if (action === "deleteClass") {
@@ -689,8 +820,13 @@ export async function POST(request: Request) {
     if (action === "deleteTeacher") {
       const itemId = id(body.id);
       if (!itemId) return fail("Giáo viên không hợp lệ.");
-      const [usage] = await db.select({ total: count() }).from(classes).where(eq(classes.teacherId, itemId));
-      if (Number(usage.total) > 0) return fail("Hãy bỏ phân công giáo viên khỏi các lớp trước.", 409);
+      const [usage, legacyUsage] = await Promise.all([
+        db.select({ total: count() }).from(classTeachers).where(eq(classTeachers.teacherId, itemId)),
+        db.select({ total: count() }).from(classes).where(eq(classes.teacherId, itemId)),
+      ]);
+      if (Number(usage[0]?.total || 0) + Number(legacyUsage[0]?.total || 0) > 0) {
+        return fail("Hãy bỏ phân công giáo viên khỏi các lớp trước.", 409);
+      }
       await db.delete(teachers).where(eq(teachers.id, itemId));
       return Response.json({ ok: true });
     }

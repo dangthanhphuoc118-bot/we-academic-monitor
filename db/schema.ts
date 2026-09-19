@@ -46,6 +46,27 @@ export const classes = sqliteTable(
   ]
 );
 
+export const classTeachers = sqliteTable(
+  "class_teachers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    classId: integer("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    teacherId: integer("teacher_id")
+      .notNull()
+      .references(() => teachers.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_class_teachers_class_teacher_unique").on(
+      table.classId,
+      table.teacherId
+    ),
+    index("idx_class_teachers_teacher_id").on(table.teacherId),
+  ]
+);
+
 export const students = sqliteTable(
   "students",
   {
@@ -197,6 +218,12 @@ export const curriculumOverrides = sqliteTable(
     ),
   ]
 );
+
+export const freestyleBanks = sqliteTable("freestyle_banks", {
+  programCode: text("program_code").primaryKey(),
+  categoriesJson: text("categories_json").notNull().default("[]"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
 
 export const levelOptions = sqliteTable(
   "level_options",
