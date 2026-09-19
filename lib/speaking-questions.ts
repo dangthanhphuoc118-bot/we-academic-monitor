@@ -1,182 +1,139 @@
 export type SpeakingProgramCode = "STARTERS" | "MOVERS" | "FLYERS";
 
-export const speakingQuestions: Record<SpeakingProgramCode, string[]> = {
-  STARTERS: [
-    "What's your name? / Are you eight years old?",
-    "How do you spell your name?",
-    "How old are you?",
-    "When is your birthday?",
-    "What colour are your eyes? / Are your eyes blue?",
-    "Do you wear glasses?",
-    "What are you wearing?",
-    "Are you wearing red shoes today?",
-    "Are your shoes new or old?",
-    "Is your bike red, new or old?",
-    "What colour is your bike, schoolbag or house?",
-    "Can you spell PINK?",
-    "Have you got a brother or a sister?",
-    "What is your father's name?",
-    "How old is your father?",
-    "What is your sister's name?",
-    "How old is your sister?",
-    "What is your brother's name?",
-    "How old is your brother?",
-    "What is your mother's name?",
-    "How old is your mother?",
-    "Is your mother's hair short or long?",
-    "Do you live in a flat, an apartment or a house?",
-    "Do you live in a big house or a small house?",
-    "How many bedrooms or living rooms are there?",
-    "Have you got a garden, a TV or a sofa?",
-    "What's in the living room?",
-    "Is the TV in the living room or in the kitchen?",
-    "Are your friends boys or girls?",
-    "What's your friend's name?",
-    "How old is your friend?",
-    "What games do you like playing with your friends?",
-    "Where do you see your friend?",
-    "What's your favourite animal?",
-    "Have you got any pets?",
-    "What's your favourite food?",
-    "What do you eat for lunch or dinner?",
-    "What's your favourite drink or fruit?",
-    "Do you like chips?",
-    "Do you eat vegetables for lunch?",
-    "Do you like playing badminton or table tennis?",
-    "Do you like swimming?",
-    "What is your favourite hobby?",
-    "What's your favourite sport?",
-    "Can you ride a bike or play the piano?",
-    "What can you do?",
-    "Do you read English books? Where do you read books?",
-    "Tell me about your school.",
-    "How do you go to school?",
-    "Do you go to school on a bus?",
-    "What colour is the bus you go to school on?",
-    "What is the name of your school?",
-    "Is your school big or small?",
-    "Where are your books?",
-    "What's in your schoolbag?",
-    "Who do you play with at school?",
-    "What's your favourite subject?",
-    "Where do you learn English?",
-    "Is your English teacher a man or a woman?",
-    "Who's sitting next to, behind or in front of you?",
-  ],
-  MOVERS: [
-    "What games do you play after school?",
-    "What do you like watching on TV?",
-    "What time do you go to bed?",
-    "Tell me about your bedroom.",
-    "Do you play computer games after school?",
-    "Do you like watching sports on television?",
-    "Do you go to bed at 8 o'clock?",
-    "Where do you live?",
-    "Do you live in the city or in the countryside?",
-    "Where do you do your homework?",
-    "Do you usually do your homework in the living room?",
-    "What do you like doing at home?",
-    "Do you like playing computer games at home?",
-    "Tell me about your house.",
-    "How many people are there in your family?",
-    "Who is the youngest or the oldest in your family?",
-    "Who do you play with at home?",
-    "What do you do with your family at the weekend?",
-    "Tell me about your mother or father.",
-    "Tell me about your favourite toy.",
-    "Tell me about your best friend.",
-    "Where do you like going with your friends?",
-    "What games do you play with your friends?",
-    "What do you like doing in the evening?",
-    "Who cooks your supper?",
-    "What do you eat for supper?",
-    "When do you go shopping?",
-    "Do you go shopping at the weekends?",
-    "Who do you go shopping with?",
-    "Do you go shopping with your mum?",
-    "What do you like buying?",
-    "Do you like buying clothes when you go shopping?",
-    "Tell me about your favourite shop.",
-    "How do you go to school?",
-    "Do you go to school by car?",
-    "How many children are there in your classroom?",
-    "Who do you play with at school?",
-    "What games do you play?",
-    "Who do you sit next to at school?",
-    "What's your favourite lesson?",
-    "When do you do your homework?",
-    "Do you do your homework in the evening?",
-    "Tell me about your English teacher.",
-    "What day do you have your English class?",
-    "Is English difficult or easy?",
-    "Where do you go after school?",
-    "Do you go home after school?",
-    "Do you like going to the park?",
-    "Where is the best place to go at the weekend?",
-    "Who do you go there with?",
-    "Do you go to the cinema at the weekend?",
-    "Where do you like going in the holidays?",
-    "Tell me about your holidays.",
-    "When do you play computer games?",
-    "Do you play computer games in your free time?",
-    "What do you like reading?",
-    "Do you like reading comics?",
-    "Where do you watch television?",
-    "Do you watch television in the living room?",
-    "Tell me about your favourite sport.",
-    "When do you play football?",
-    "Tell me about the weekends.",
-    "What clothes do you like wearing?",
-    "What's your favourite food?",
-    "Do you like chicken, chips or beef?",
-    "Who cooks the food in your family?",
-    "Where do you eat in your home?",
-    "Do you eat in the kitchen?",
-    "Tell me about your breakfast.",
-    "Where do you have lunch?",
-    "Tell me about your favourite drinks.",
-  ],
-  FLYERS: [
-    "What's your best friend's name? Where does he or she live?",
-    "Do you often see your best friend at school?",
-    "Can you describe your best friend's appearance?",
-    "What do you often do with your best friend in your free time?",
-    "Has your best friend got any pets?",
-    "What's the name of his or her pet?",
-    "Who do you often talk to at home?",
-    "What does your family member do?",
-    "Is he or she busy?",
-    "Can you describe your mom or dad?",
-    "What do you and your mom or dad often do together?",
-    "Does your mom or dad cook well?",
-    "How many children are there in your class?",
-    "When does your school start and finish?",
-    "What's the subject you like best?",
-    "What sport do you play at school?",
-    "Do you have a favourite teacher at school?",
-    "What's your favourite teacher's name?",
-    "What subject does your favourite teacher teach you?",
-    "Does your school have a big yard, swimming pool or playground?",
-    "Do you often have holidays in the summer?",
-    "Where do you often go on holidays?",
-    "Who do you often go on holidays with?",
-    "What's your favourite weather?",
-    "Have you ever gone picnicking?",
-    "What would you wear when you go picnicking?",
-    "Have you ever gone camping?",
-    "What would you wear when you go camping?",
-    "What time do you often wake up?",
-    "Do you have breakfast at home or at a food stall?",
-    "What time do you go to school and how do you go there?",
-    "What do you often do after school?",
-  ],
+export type FreestyleQuestionCategory = {
+  category: string;
+  yesNoQuestions: string[];
+  whQuestions: string[];
 };
 
-export function sampleSpeakingQuestions(programCodeOrQuestions: string | readonly string[], count = 5) {
-  const source = Array.isArray(programCodeOrQuestions)
-    ? programCodeOrQuestions
-    : speakingQuestions[programCodeOrQuestions as SpeakingProgramCode] || [];
-  const shuffled = [...source];
+export type FreestyleBank = {
+  programCode: SpeakingProgramCode;
+  programLabel: string;
+  categories: FreestyleQuestionCategory[];
+  updatedAt?: string | null;
+};
+
+export const defaultFreestyleBanks: Record<SpeakingProgramCode, FreestyleQuestionCategory[]> = {
+  STARTERS: [
+    {
+      category: "Personal information",
+      yesNoQuestions: [
+        "Are you eight years old?",
+        "Are your eyes blue?",
+        "Do you wear glasses?",
+        "Are you wearing red shoes today?",
+        "Are your shoes new or old?",
+        "Is your bike red / new / old?",
+      ],
+      whQuestions: [
+        "What's your name?",
+        "How do you spell your name?",
+        "How old are you?",
+        "When is your birthday?",
+        "What colour are your eyes?",
+        "What are you wearing?",
+        "What colour is your bike / your schoolbag / house?",
+      ],
+    },
+    {
+      category: "Family and Friends",
+      yesNoQuestions: [
+        "Do you have a brother?",
+        "Do you have a sister?",
+        "Is your mother's/friend's hair long?",
+        "Are your friends girls/boys?",
+      ],
+      whQuestions: [
+        "How many people are there in your family?",
+        "How old is your father/mother/brother/sister/friend?",
+      ],
+    },
+    {
+      category: "Your house",
+      yesNoQuestions: [
+        "Do you live in a house?",
+        "Is your house big?",
+        "Do you have a garden?",
+      ],
+      whQuestions: [
+        "How many rooms are there in your house?",
+        "What do you have in your living room?",
+      ],
+    },
+    {
+      category: "Sports",
+      yesNoQuestions: [
+        "Can you swim / play badminton?",
+        "Do you like swimming?",
+      ],
+      whQuestions: ["What is your favorite sport?"],
+    },
+    {
+      category: "Food",
+      yesNoQuestions: [
+        "Do you like chicken?",
+        "Do you eat vegetables?",
+      ],
+      whQuestions: [
+        "What's your favourite food?",
+        "What do you eat for lunch / dinner?",
+        "What's your favourite drink / fruit?",
+        "What do you eat for lunch?",
+      ],
+    },
+    {
+      category: "Animals",
+      yesNoQuestions: [
+        "Do you like animals?",
+        "Do you like dogs?",
+        "Do you have a pet?",
+      ],
+      whQuestions: ["What animals do you like?"],
+    },
+    {
+      category: "Schools",
+      yesNoQuestions: [
+        "Do you go to school by car?",
+        "Is your school big?",
+        "Do you like your school?",
+      ],
+      whQuestions: [
+        "How do you go to school?",
+        "What is the name of your school?",
+        "What's your favourite subject?",
+        "Who's your favorite teacher?",
+        "Where is your school?",
+        "What do you like to do at school?",
+      ],
+    },
+  ],
+  MOVERS: [],
+  FLYERS: [],
+};
+
+const cleanQuestions = (value: unknown) => Array.isArray(value)
+  ? Array.from(new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))).slice(0, 200)
+  : [];
+
+export function normalizeFreestyleCategories(value: unknown): FreestyleQuestionCategory[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 50).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const source = item as Record<string, unknown>;
+    const category = typeof source.category === "string" ? source.category.trim() : "";
+    const yesNoQuestions = cleanQuestions(source.yesNoQuestions);
+    const whQuestions = cleanQuestions(source.whQuestions);
+    if (!category || !yesNoQuestions.length && !whQuestions.length) return [];
+    return [{ category, yesNoQuestions, whQuestions }];
+  });
+}
+
+export function flattenFreestyleCategories(categories: readonly FreestyleQuestionCategory[]) {
+  return Array.from(new Set(categories.flatMap((category) => [...category.yesNoQuestions, ...category.whQuestions])));
+}
+
+export function sampleSpeakingQuestions(questions: readonly string[], count = 5) {
+  const shuffled = [...questions];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const randomIndex = Math.floor(Math.random() * (index + 1));
     [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];

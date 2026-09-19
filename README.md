@@ -5,6 +5,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 ## Chức năng chính
 
 - Quản lý lớp, học viên và giáo viên.
+- Một lớp có thể phân công nhiều giáo viên; số lớp của từng giáo viên được tính theo toàn bộ phân công.
 - Khung chương trình Baby Stars, Super Kids 1–8, Starters, Movers và Flyers.
 - Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
@@ -12,7 +13,8 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp; lớp không còn gắn cứng với một trình độ.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
 - Khung Movers và Flyers hiển thị riêng 5 nhóm ADJ, NOUN, VERB, ADV và PREPOSITION.
-- Mỗi Unit Starters, Movers và Flyers có ngân hàng Freestyle riêng trong Khung chương trình; có thể sửa từng câu, phiếu kiểm tra chọn ngẫu nhiên đúng 5 câu từ Unit đang mở.
+- Mỗi level Starters, Movers và Flyers có một ngân hàng Freestyle chung cho toàn bộ Unit; có thể tự tạo nhóm, sửa từng câu và phiếu kiểm tra chọn ngẫu nhiên đúng 5 câu từ level của học viên.
+- Starters có sẵn 46 câu theo 7 chủ đề từ tài liệu mới; Movers và Flyers để trống để nhập trực tiếp trong Khung chương trình.
 - Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
 - Đánh giá giáo viên theo Classroom Observation: 7 tiêu chí Academic/Attitude, ô chọn và ghi chú; lưu, xem, sửa/xóa từng phiếu.
 - Tab Theo dõi 48 tuần: tự động giữ tuần hiện tại và 47 tuần trước; sang tuần mới sẽ xóa vĩnh viễn kết quả của tuần thứ 49 trong quá khứ.
@@ -61,6 +63,8 @@ npm run deploy
 - Migration `0004_rich_masked_marvel.sql` chỉ tạo bảng danh sách chờ kiểm tra; không sửa hoặc xóa dữ liệu học vụ hiện có.
 - Migration `0005_strong_violations.sql` chỉ tạo bảng Observation và mốc theo dõi 48 tuần; giữ nguyên mọi dữ liệu cũ.
 - Migration `0006_awesome_turbo.sql` chỉ thêm cột ngân hàng Freestyle theo Unit; giữ nguyên mọi dữ liệu cũ.
+- Migration `0007_unique_polaris.sql` tạo bảng phân công nhiều giáo viên và tự chuyển giáo viên đang gắn với từng lớp; không làm mất phân công cũ.
+- Migration `0008_closed_jack_murdock.sql` tạo ngân hàng Freestyle theo level và chủ động xóa nội dung Freestyle cũ theo từng Unit của Starters, Movers và Flyers. Migration không xóa 5 câu đã lưu trong lịch sử kết quả kiểm tra.
 - Việc xóa dữ liệu học viên ngoài 48 tuần không nằm trong migration. Nó chạy khi người dùng đã đăng nhập tải dashboard hoặc tab Theo dõi 48 tuần. Vì vậy phải sao lưu D1 trước khi triển khai bản này nếu cần giữ lịch sử lâu hơn.
 - Trước mỗi thay đổi lớn, xuất bản sao D1 theo hướng dẫn trong `HUONG-DAN-SETUP.md`.
 

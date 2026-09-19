@@ -47,7 +47,7 @@ const sqlite = new DatabaseSync(":memory:");
 sqlite.exec("PRAGMA foreign_keys = ON");
 const migrationDir = new URL("../drizzle/", import.meta.url);
 const migrations = readdirSync(migrationDir).filter((name) => name.endsWith(".sql")).sort();
-const additiveMigrations = migrations.filter((name) => name.startsWith("0005_") || name.startsWith("0006_"));
+const additiveMigrations = migrations.filter((name) => Number(name.slice(0, 4)) >= 5);
 for (const migration of migrations.filter((name) => !additiveMigrations.includes(name))) sqlite.exec(readFileSync(new URL(migration, migrationDir), "utf8"));
 sqlite.exec(`
   INSERT INTO teachers(id,name) VALUES (1,'Teacher One');
@@ -69,7 +69,10 @@ const preservationQueries = [
   ["curriculum_overrides", "SELECT program_code, unit_number, vocabulary FROM curriculum_overrides"],
 ];
 const beforeMigration = preservationQueries.map(([table, query]) => [table, query, JSON.stringify(sqlite.prepare(query).all())]);
-for (const migration of additiveMigrations) sqlite.exec(readFileSync(new URL(migration, migrationDir), "utf8"));
+for (const migration of additiveMigrations) {
+  if (migration.startsWith("0008_")) sqlite.exec("UPDATE curriculum_overrides SET freestyle_questions='[\"Old D1 question?\"]' WHERE program_code='FLYERS' AND unit_number=1");
+  sqlite.exec(readFileSync(new URL(migration, migrationDir), "utf8"));
+}
 const adapter = {
   prepare(sql) {
     let values = [];
@@ -100,6 +103,8 @@ const req = (path, role = "academic_leader", body) => new Request(`https://test.
 
 test("Additive migrations preserve existing learners, reviews, auth and curriculum overrides", () => {
   for (const [table, query, snapshot] of beforeMigration) assert.equal(JSON.stringify(sqlite.prepare(query).all()), snapshot, table);
+  assert.equal(JSON.stringify(sqlite.prepare("SELECT class_id AS classId, teacher_id AS teacherId FROM class_teachers").all()), JSON.stringify([{ classId: 1, teacherId: 1 }]));
+  assert.equal(sqlite.prepare("SELECT freestyle_questions AS questions FROM curriculum_overrides WHERE program_code='FLYERS' AND unit_number=1").get().questions, "[]");
 });
 
 test("Both endpoints reject missing or expired sessions", async () => {
@@ -175,18 +180,60 @@ test("Academic payload includes observations and does not overwrite custom curri
   assert.equal(data.teacherReviews.length, 1);
   const unit = data.curriculum.find((unit) => unit.programCode === "FLYERS" && unit.unitNumber === 1);
   assert.equal(unit.vocabulary, "My custom vocabulary");
-  assert.ok(unit.freestyleQuestions.length >= 5);
+  assert.equal(Object.hasOwn(unit, "freestyleQuestions"), false);
   assert.match(data.curriculum.find((unit) => unit.programCode === "FLYERS" && unit.unitNumber === 2).vocabulary, /PREPOSITION:/);
+  const startersBank = data.freestyleBanks.find((bank) => bank.programCode === "STARTERS");
+  assert.deepEqual(startersBank.categories.map((category) => category.category), ["Personal information", "Family and Friends", "Your house", "Sports", "Food", "Animals", "Schools"]);
+  assert.equal(startersBank.categories.flatMap((category) => [...category.yesNoQuestions, ...category.whQuestions]).length, 46);
+  assert.deepEqual(data.freestyleBanks.find((bank) => bank.programCode === "MOVERS").categories, []);
+  assert.deepEqual(data.freestyleBanks.find((bank) => bank.programCode === "FLYERS").categories, []);
 
-  const customQuestions = ["Unit 1 question A?", "Unit 1 question B?", "Unit 1 question C?", "Unit 1 question D?", "Unit 1 question E?"];
-  const saved = await academic.POST(req("/api/academic", "academic_manager", { action: "updateCurriculumUnit", ...unit, freestyleQuestions: customQuestions }));
+  const blockedQuestions = ["Mover A?", "Mover B?", "Mover C?", "Mover D?", "Mover E?"];
+  const blocked = await academic.POST(req("/api/academic", "academic_leader", { action: "createLearningCheck", studentId: 2, programCode: "MOVERS", unitNumber: 1, checkedAt: "2026-09-18", notes: "", feedback: [], evaluation: { patternPercent: 90, freestylePercent: 90, pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct", freestyleQuestions: blockedQuestions } }));
+  assert.equal(blocked.status, 400);
+  assert.match((await blocked.json()).error, /cần ít nhất 5 câu/);
+
+  const customQuestions = ["Flyers question A?", "Flyers question B?", "Flyers question C?", "Flyers question D?", "Flyers question E?"];
+  const bankSaved = await academic.POST(req("/api/academic", "academic_manager", { action: "updateFreestyleBank", programCode: "FLYERS", categories: [{ category: "General", yesNoQuestions: customQuestions.slice(0, 2), whQuestions: customQuestions.slice(2) }] }));
+  assert.equal(bankSaved.status, 200, await bankSaved.clone().text());
+  const saved = await academic.POST(req("/api/academic", "academic_manager", { action: "updateCurriculumUnit", ...unit }));
   assert.equal(saved.status, 200, await saved.clone().text());
   const refreshed = await (await academic.GET(req("/api/academic"))).json();
-  assert.deepEqual(refreshed.curriculum.find((row) => row.programCode === "FLYERS" && row.unitNumber === 1).freestyleQuestions, customQuestions);
+  assert.deepEqual(refreshed.freestyleBanks.find((bank) => bank.programCode === "FLYERS").categories[0].whQuestions, customQuestions.slice(2));
+  assert.equal(Object.hasOwn(refreshed.curriculum.find((row) => row.programCode === "FLYERS" && row.unitNumber === 1), "freestyleQuestions"), false);
+});
+
+test("A class can assign multiple teachers and keeps the previous teacher after migration", async () => {
+  let data = await (await academic.GET(req("/api/academic"))).json();
+  let classroom = data.classes.find((row) => row.id === 1);
+  assert.deepEqual(classroom.teacherIds, [1]);
+  assert.deepEqual(classroom.teacherNames, ["Teacher One"]);
+
+  const created = await academic.POST(req("/api/academic", "academic_manager", { action: "createTeacher", name: "Teacher Two", status: "active" }));
+  assert.equal(created.status, 201, await created.clone().text());
+  const teacherTwo = (await created.json()).item;
+
+  const updated = await academic.POST(req("/api/academic", "academic_leader", { action: "updateClass", id: 1, name: "CLASS A", schedule: "Thứ 2, 4", room: "P.1", status: "active", teacherIds: [1, teacherTwo.id, teacherTwo.id] }));
+  assert.equal(updated.status, 200, await updated.clone().text());
+  assert.deepEqual((await updated.json()).item.teacherIds, [1, teacherTwo.id]);
+
+  data = await (await academic.GET(req("/api/academic"))).json();
+  classroom = data.classes.find((row) => row.id === 1);
+  assert.deepEqual(classroom.teacherIds, [1, teacherTwo.id]);
+  assert.deepEqual(classroom.teacherNames, ["Teacher One", "Teacher Two"]);
+  assert.equal(data.teachers.find((row) => row.id === 1).classCount, 1);
+  assert.equal(data.teachers.find((row) => row.id === teacherTwo.id).classCount, 1);
+  assert.equal((await academic.POST(req("/api/academic", "admin", { action: "deleteTeacher", id: teacherTwo.id }))).status, 409);
+  assert.equal((await academic.POST(req("/api/academic", "admin", { action: "updateClass", id: 1, name: "CLASS A", teacherIds: [9999] }))).status, 400);
+
+  const reassigned = await academic.POST(req("/api/academic", "academic_manager", { action: "updateClass", id: 1, name: "CLASS A", schedule: "Thứ 2, 4", room: "P.1", status: "active", teacherIds: [teacherTwo.id] }));
+  assert.equal(reassigned.status, 200, await reassigned.clone().text());
+  assert.equal(sqlite.prepare("SELECT teacher_id AS teacherId FROM classes WHERE id=1").get().teacherId, teacherTwo.id);
+  assert.equal(JSON.stringify(sqlite.prepare("SELECT teacher_id AS teacherId FROM class_teachers WHERE class_id=1").all()), JSON.stringify([{ teacherId: teacherTwo.id }]));
 });
 
 test("Saving and editing a student check updates its rolling history without duplicate records", async () => {
-  const questions = ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"];
+  const questions = ["Flyers question A?", "Flyers question B?", "Flyers question C?", "Flyers question D?", "Flyers question E?"];
   const body = { action: "createLearningCheck", studentId: 1, programCode: "FLYERS", unitNumber: 2, checkedAt: "2026-09-18", notes: "Weekly feedback", feedback: [], evaluation: { patternPercent: 90, freestylePercent: 90, pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct", freestyleQuestions: questions } };
   const created = await academic.POST(req("/api/academic", "academic_leader", body));
   assert.equal(created.status, 201, await created.clone().text());

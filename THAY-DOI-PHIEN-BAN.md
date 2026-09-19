@@ -1,3 +1,15 @@
+# Thay đổi phiên bản ngày 19/09/2026
+
+- Chuyển Freestyle từ từng Unit thành một ngân hàng chung cho toàn bộ level Starters, Movers hoặc Flyers.
+- Nạp 46 câu Starters từ PDF mới, chia thành 7 nhóm chủ đề và hai cột YES/NO, WH QUESTIONS.
+- Để trống ngân hàng Movers và Flyers để người dùng tự tạo nhóm, thêm, sửa hoặc xóa câu trực tiếp trong Khung chương trình.
+- Phiếu kiểm tra lấy ngẫu nhiên đúng 5 câu từ ngân hàng chung của level; không cho tạo lượt kiểm tra mới nếu level chưa đủ 5 câu.
+- Giữ nguyên 5 câu đã nằm trong `evaluation_json` của các kết quả cũ, kể cả khi ngân hàng chung được sửa hoặc để trống sau này.
+- Migration `0008_closed_jack_murdock.sql` tạo bảng `freestyle_banks` và xóa có chủ đích toàn bộ nội dung Freestyle cũ theo Unit của Starters/Movers/Flyers trong D1. Các dữ liệu học vụ và lịch sử kết quả khác không bị migration xóa.
+- 17/17 kiểm thử API/migration/giao diện đạt; TypeScript, ESLint và build production đạt.
+
+---
+
 # Thay đổi phiên bản ngày 18/09/2026
 
 - Cập nhật toàn bộ 12 Unit Flyers từ PDF mới; Vocabulary chia 5 nhóm ADJ, NOUN, VERB, ADV, PREPOSITION như Movers.
@@ -6,9 +18,10 @@
 - Phiếu giáo viên chuyển sang Classroom Observation theo PDF: Date, Time, Class, Teacher/TA; 4 tiêu chí Academic và 3 tiêu chí Attitude, mỗi tiêu chí có checkbox và Note.
 - Observation được lưu trong D1, có tìm kiếm, xem chi tiết, cập nhật, xóa và xuất hiện trong Báo cáo giáo viên. Không quy đổi ô chọn thành điểm.
 - Đưa ngân hàng Freestyle vào từng Unit Starters, Movers và Flyers trong Khung chương trình; cho phép sửa từng câu và lấy ngẫu nhiên đúng 5 câu từ Unit đang kiểm tra.
+- Cho phép một lớp phân công nhiều giáo viên; thẻ lớp hiển thị toàn bộ giáo viên và thống kê số lớp của giáo viên dùng bảng phân công mới.
 - Tab Theo dõi 48 tuần dùng cửa sổ cuốn chiếu gồm tuần hiện tại và 47 tuần trước; tự xóa kết quả của tuần thứ 49 trong quá khứ, hỗ trợ kiểm tra bổ sung và cập nhật từ lịch sử.
 - Endpoint lịch sử đọc đủ 48 tuần theo từng học viên, gồm cả đánh giá cũ và không áp giới hạn 300 bản ghi của tổng quan.
-- Migration `0005_strong_violations.sql` tạo hai bảng và `0006_awesome_turbo.sql` thêm cột ngân hàng Freestyle; migration không xóa dữ liệu cũ. Việc dọn kết quả ngoài 48 tuần chạy sau khi người dùng đăng nhập tải hệ thống. Session vẫn 30 ngày, Manager và Leader vẫn có quyền học vụ ngang nhau.
+- Migration `0005_strong_violations.sql` tạo hai bảng, `0006_awesome_turbo.sql` thêm ngân hàng Freestyle và `0007_unique_polaris.sql` tạo bảng phân công nhiều giáo viên, tự chuyển phân công cũ. Migration không xóa dữ liệu cũ. Việc dọn kết quả ngoài 48 tuần chạy sau khi người dùng đăng nhập tải hệ thống. Session vẫn 30 ngày, Manager và Leader vẫn có quyền học vụ ngang nhau.
 - Chi tiết triển khai: `HUONG-DAN-CAP-NHAT-18-09-2026.md`.
 
 ---

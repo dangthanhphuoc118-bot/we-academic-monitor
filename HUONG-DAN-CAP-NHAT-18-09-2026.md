@@ -1,14 +1,15 @@
 # Cập nhật WE Academic Monitor — 18/09/2026
 
-Gói này dùng để cập nhật repository GitHub và Cloudflare Workers/D1 đang hoạt động. Bản cập nhật giữ các chức năng trước đó, đồng thời bổ sung ngân hàng Freestyle theo từng Unit và đổi lịch sử học viên thành cửa sổ cuốn chiếu 48 tuần.
+Gói này dùng để cập nhật repository GitHub và Cloudflare Workers/D1 đang hoạt động. Bản cập nhật giữ các chức năng trước đó, đồng thời chuyển Freestyle thành ngân hàng chung theo level và giữ lịch sử học viên theo cửa sổ cuốn chiếu 48 tuần.
 
 ## Nội dung của bản cập nhật
 
 1. **Flyers:** 12 Unit có Vocabulary chia thành ADJ, NOUN, VERB, ADV và PREPOSITION, giống Movers.
-2. **Freestyle trong Khung chương trình:** mỗi Unit Starters, Movers và Flyers hiển thị một ngân hàng câu hỏi riêng. Academic Manager/Leader có thể mở Unit, nhập mỗi câu trên một dòng và lưu; cần ít nhất 5 câu. Phiếu kiểm tra chọn ngẫu nhiên đúng 5 câu từ ngân hàng của Unit đang mở và có nút đổi 5 câu.
+2. **Freestyle trong Khung chương trình:** mỗi level Starters, Movers và Flyers có một ngân hàng dùng chung cho mọi Unit. Starters có sẵn 46 câu chia 7 chủ đề theo PDF mới. Movers/Flyers bắt đầu trống để Academic Manager/Leader tự thêm nhóm và nhập câu trực tiếp. Cần ít nhất 5 câu để bắt đầu lượt kiểm tra mới.
 3. **Bỏ điểm tổng dạng /5:** không còn các số như `2/5`, `2.03/5` hoặc `3.25/5` trên giao diện. Các tiêu chí chi tiết và nhãn Good/Average/Redflag vẫn giữ nguyên.
 4. **Class Observation:** đánh giá giáo viên/TA bằng 7 tiêu chí Academic/Attitude, ô chọn và ghi chú; không dùng thang điểm.
 5. **Theo dõi cuốn chiếu 48 tuần:** luôn giữ tuần hiện tại và 47 tuần trước đó. Khi sang tuần mới, kết quả cũ hơn ngày bắt đầu của cửa sổ được xóa vĩnh viễn khỏi D1.
+6. **Nhiều giáo viên cho một lớp:** form lớp cho phép tick nhiều giáo viên; thẻ lớp hiển thị tất cả người được phân công và trang Giáo viên tính đúng số lớp của từng người.
 
 | Academic | Attitude |
 | --- | --- |
@@ -19,7 +20,12 @@ Gói này dùng để cập nhật repository GitHub và Cloudflare Workers/D1 �
 
 ## Cảnh báo trước khi cập nhật
 
-Việc xóa lịch sử quá hạn là chủ đích của bản này. Migration không xóa dữ liệu ngay, nhưng sau khi Worker mới được triển khai, lần đầu một người dùng đã đăng nhập tải dashboard hoặc tab **Theo dõi 48 tuần** sẽ bắt đầu dọn dữ liệu quá hạn.
+Hai thao tác xóa dữ liệu là chủ đích của bản này:
+
+- Migration `0008_closed_jack_murdock.sql` xóa ngân hàng Freestyle cũ nằm theo từng Unit của Starters, Movers và Flyers trong `curriculum_overrides.freestyle_questions`. Điều này bao gồm các câu Movers/Flyers đã từng nhập vào D1.
+- Sau khi Worker mới được triển khai, lần đầu một người dùng đã đăng nhập tải dashboard hoặc tab **Theo dõi 48 tuần** sẽ bắt đầu dọn lịch sử quá hạn.
+
+Migration không sửa `learning_checks.evaluation_json`, vì vậy 5 câu Freestyle đã lưu cùng các kết quả kiểm tra cũ vẫn được giữ để xem hoặc cập nhật lịch sử.
 
 Hệ thống xóa:
 
@@ -50,13 +56,13 @@ Nếu lệnh export thất bại, dừng cập nhật và kiểm tra lại tài 
 2. Chép nội dung thư mục `WE-Academic-Monitor-Cloudflare` vào đúng thư mục gốc repository hiện tại, cùng nơi có `package.json`.
 3. Chọn ghi đè file trùng tên, nhưng **giữ nguyên `wrangler.jsonc` đang có trên GitHub**. Gói SAFE không chứa file này để tránh thay Database ID thật.
 4. D1 binding phải là `DB`, tên database là `we-academic-monitor-db`, và `migrations_dir` là `drizzle`.
-5. Giữ toàn bộ migration cũ và thêm `0005_strong_violations.sql`, `0006_awesome_turbo.sql` cùng metadata mới. Không sửa/xóa migration đã chạy và không tạo database mới.
+5. Giữ toàn bộ migration cũ và thêm `0005_strong_violations.sql`, `0006_awesome_turbo.sql`, `0007_unique_polaris.sql`, `0008_closed_jack_murdock.sql` cùng metadata mới. Không sửa/xóa migration đã chạy và không tạo database mới.
 
 Nếu dùng Git:
 
 ```bash
 git add .
-git commit -m "Add per-unit Freestyle banks and rolling 48-week history"
+git commit -m "Move Freestyle banks to Cambridge levels"
 git push
 ```
 
@@ -73,8 +79,10 @@ Deploy command: npm run deploy
 
 - `0005_strong_violations.sql` tạo bảng Observation và bảng mốc theo dõi cũ.
 - `0006_awesome_turbo.sql` thêm cột `freestyle_questions` vào `curriculum_overrides`.
+- `0007_unique_polaris.sql` tạo bảng `class_teachers` và tự sao chép mọi `teacher_id` đang có ở lớp sang bảng phân công mới.
+- `0008_closed_jack_murdock.sql` tạo bảng `freestyle_banks` theo level và xóa dữ liệu Freestyle cũ theo từng Unit của Starters/Movers/Flyers.
 
-Hai migration đều chỉ bổ sung cấu trúc, không xóa dữ liệu. Bảng mốc theo dõi cũ được giữ để tương thích nhưng giao diện mới không còn cho đặt mốc thủ công.
+Các bảng học viên, lớp, giáo viên, tài khoản, Observation và kết quả kiểm tra cũ không bị migration xóa. Riêng dữ liệu Freestyle cũ theo Unit bị xóa có chủ đích như cảnh báo ở trên. Bảng mốc theo dõi cũ được giữ để tương thích nhưng giao diện mới không còn cho đặt mốc thủ công.
 
 Nếu deploy từ máy tính:
 
@@ -88,13 +96,13 @@ npm run deploy
 
 ### Ngân hàng Freestyle
 
-1. Mở **Khung chương trình → Starters/Movers/Flyers**.
-2. Mở một Unit và kiểm tra mục **Freestyle question bank**.
-3. Bấm sửa Unit, nhập mỗi câu trên một dòng; không nhập dòng trùng và cần ít nhất 5 câu.
-4. Lưu, sau đó mở phiếu kiểm tra đúng Unit. Xác nhận phiếu hiện 5 câu lấy từ ngân hàng vừa lưu.
-5. Bấm **Đổi 5 câu** để lấy mẫu khác. Kết quả đã lưu vẫn giữ nguyên 5 câu đã dùng lúc kiểm tra, kể cả khi ngân hàng Unit được sửa sau đó.
+1. Mở **Khung chương trình → Starters** và kiểm tra ngân hàng chung có 7 nhóm, tổng cộng 46 câu.
+2. Mở **Movers** hoặc **Flyers**; ngân hàng ban đầu phải trống.
+3. Bấm **Chỉnh sửa ngân hàng**, tạo nhóm chủ đề rồi nhập mỗi câu trên một dòng vào cột YES/NO hoặc WH QUESTIONS.
+4. Lưu, sau đó mở phiếu kiểm tra một Unit bất kỳ thuộc đúng level. Xác nhận phiếu hiện 5 câu lấy từ ngân hàng chung vừa lưu.
+5. Bấm **Đổi 5 câu** để lấy mẫu khác. Kết quả đã lưu vẫn giữ nguyên 5 câu đã dùng lúc kiểm tra, kể cả khi ngân hàng level được sửa sau đó.
 
-Unit từng được chỉnh sửa trước bản này sẽ tự dùng ngân hàng mặc định của chương trình cho đến khi bạn mở và lưu ngân hàng riêng của Unit. Nút **Khôi phục nội dung gốc** thay toàn bộ nội dung Unit, bao gồm cả ngân hàng Freestyle.
+Nút **Khôi phục nội dung gốc** của Unit chỉ khôi phục Vocabulary/Communication và không thay đổi ngân hàng Freestyle chung của level. Hệ thống cho phép lưu ngân hàng trống, nhưng sẽ khóa việc tạo lượt kiểm tra mới cho đến khi level có ít nhất 5 câu.
 
 ### Theo dõi 48 tuần
 
@@ -111,11 +119,22 @@ Nếu một tuần có nhiều lượt kiểm tra, tất cả lượt trong cử
 
 Admin, Academic Manager và Academic Leader đều có thể quản lý học vụ, kiểm tra học viên, dùng Observation và xem báo cáo. Quản lý tài khoản chỉ dành cho Admin. Phiên đăng nhập kéo dài tối đa 30 ngày, hoặc kết thúc sớm khi đăng xuất, tài khoản bị khóa hay phiên hết hiệu lực.
 
+### Phân công nhiều giáo viên
+
+1. Vào **Lớp học** và bấm **Chỉnh sửa** trên lớp cần thay đổi.
+2. Trong mục **Giáo viên phụ trách**, tick một hoặc nhiều giáo viên.
+3. Bấm **Lưu thay đổi**. Có thể bỏ chọn tất cả nếu lớp chưa phân công.
+4. Thẻ lớp sẽ hiển thị toàn bộ tên đã chọn; cột **Phân công** ở trang Giáo viên cũng cập nhật số lớp tương ứng.
+
+Giáo viên đã được phân công không thể bị xóa khỏi danh sách cho đến khi được bỏ chọn khỏi tất cả lớp. Phân công một giáo viên cũ của mỗi lớp được migration tự chuyển, không cần nhập lại.
+
 ## Nếu gặp lỗi
 
 - **Database not found / ID toàn số 0:** thay `database_id` trong `wrangler.jsonc` bằng ID thật của D1 hiện tại. Không tạo D1 mới nếu muốn giữ dữ liệu.
 - **`no such table: teacher_observations`:** kiểm tra log migration `0005` và Deploy command `npm run deploy`.
 - **`no such column: freestyle_questions`:** kiểm tra migration `0006` đã được tải lên GitHub và được áp dụng.
+- **`no such table: class_teachers`:** kiểm tra migration `0007` đã được tải lên GitHub và Deploy command vẫn là `npm run deploy`.
+- **`no such table: freestyle_banks`:** kiểm tra migration `0008` đã được tải lên GitHub và Deploy command vẫn là `npm run deploy`.
 - **`table already exists`:** không DROP TABLE và không chạy lại migration khởi tạo thủ công; giữ dữ liệu rồi kiểm tra bảng `d1_migrations`.
 - **Không thấy thay đổi:** kiểm tra đúng commit/Worker, deploy thành công, rồi tải lại bằng Ctrl+F5.
 
@@ -128,4 +147,4 @@ npm run lint
 npm run build
 ```
 
-Kiểm thử API dùng SQLite độc lập, không kết nối hoặc ghi vào D1 thật. Bản này có 15 kiểm thử cho migration, quyền, Observation, Freestyle theo Unit và dọn lịch sử tuần thứ 49.
+Kiểm thử API dùng SQLite độc lập, không kết nối hoặc ghi vào D1 thật. Bản này có 17 kiểm thử cho migration, quyền, Observation, Freestyle theo level, phân công nhiều giáo viên và dọn lịch sử tuần thứ 49.
