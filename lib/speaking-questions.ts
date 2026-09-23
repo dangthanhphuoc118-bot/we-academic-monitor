@@ -140,3 +140,42 @@ export function sampleSpeakingQuestions(questions: readonly string[], count = 5)
   }
   return shuffled.slice(0, Math.min(count, shuffled.length));
 }
+
+export type FreestyleQuestionKind = "yes_no" | "wh";
+
+export function freestyleQuestionKind(
+  question: string,
+  categories: readonly FreestyleQuestionCategory[]
+): FreestyleQuestionKind {
+  if (categories.some((category) => category.yesNoQuestions.includes(question))) return "yes_no";
+  if (categories.some((category) => category.whQuestions.includes(question))) return "wh";
+  return /^(am|is|are|was|were|do|does|did|can|could|will|would|have|has|had)\b/i.test(question.trim())
+    ? "yes_no"
+    : "wh";
+}
+
+export function splitFreestyleQuestions(
+  questions: readonly string[],
+  categories: readonly FreestyleQuestionCategory[]
+) {
+  return {
+    yesNo: questions.filter((question) => freestyleQuestionKind(question, categories) === "yes_no"),
+    wh: questions.filter((question) => freestyleQuestionKind(question, categories) === "wh"),
+  };
+}
+
+export function sampleFreestyleQuestionsByType(
+  categories: readonly FreestyleQuestionCategory[],
+  count = 5
+) {
+  const yesNo = Array.from(new Set(categories.flatMap((category) => category.yesNoQuestions)));
+  const wh = Array.from(new Set(categories.flatMap((category) => category.whQuestions)));
+  const yesTarget = Math.min(yesNo.length, Math.ceil(count / 2));
+  const whTarget = Math.min(wh.length, Math.floor(count / 2));
+  const selected = [
+    ...sampleSpeakingQuestions(yesNo, yesTarget),
+    ...sampleSpeakingQuestions(wh, whTarget),
+  ];
+  const remaining = [...yesNo, ...wh].filter((question) => !selected.includes(question));
+  return [...selected, ...sampleSpeakingQuestions(remaining, count - selected.length)].slice(0, count);
+}
