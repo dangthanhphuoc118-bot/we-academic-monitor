@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
 import { curriculumDefaults } from "../lib/curriculum.ts";
-import { defaultFreestyleBanks, flattenFreestyleCategories, sampleSpeakingQuestions } from "../lib/speaking-questions.ts";
+import { cambridgeColumnPercent, normalizeCambridgeEvaluation } from "../lib/cambridge-evaluation.ts";
+import { defaultFreestyleBanks, flattenFreestyleCategories, sampleFreestyleQuestionsByType, sampleSpeakingQuestions, splitFreestyleQuestions } from "../lib/speaking-questions.ts";
 import { parseVocabularyGroups, vocabularyGroupLabels } from "../lib/vocabulary.ts";
 
 const flyers = curriculumDefaults.filter((unit) => unit.programCode === "FLYERS");
@@ -62,12 +63,17 @@ test("Freestyle is one editable bank per Cambridge level and Starters has the PD
   assert.equal(sampled.length, 5);
   assert.equal(new Set(sampled).size, 5);
   assert.ok(sampled.every((question) => bank.includes(question)));
+  const groupedSample = splitFreestyleQuestions(sampleFreestyleQuestionsByType(defaultFreestyleBanks.STARTERS), defaultFreestyleBanks.STARTERS);
+  assert.equal(groupedSample.yesNo.length, 3);
+  assert.equal(groupedSample.wh.length, 2);
 
   const form = readFileSync(new URL("../app/curriculum-check.tsx", import.meta.url), "utf8");
   assert.ok(form.includes("Freestyle · ngân hàng chung level"));
   assert.ok(form.includes("áp dụng cho toàn bộ level"));
   assert.ok(form.includes('send("updateFreestyleBank"'));
   assert.ok(!form.includes("unit.freestyleQuestions"));
+  assert.ok(form.includes('title="YES / NO"'));
+  assert.ok(form.includes('title="WH QUESTIONS"'));
 });
 
 test("Dashboard and check form do not render aggregate /5 scores", () => {
@@ -89,10 +95,23 @@ test("Dashboard and check form do not render aggregate /5 scores", () => {
 test("Detailed criteria and grade classification are retained", () => {
   const dashboard = readFileSync(new URL("../app/academic-dashboard.tsx", import.meta.url), "utf8");
   const form = readFileSync(new URL("../app/curriculum-check.tsx", import.meta.url), "utf8");
-  for (const label of ["Pattern", "Freestyle", "Vocabulary", "Pronunciation"]) assert.ok(dashboard.includes(`label: "${label}"`));
+  for (const label of ["Vocabulary", "Pronunciation", "Pattern · Pronunciation", "Free · Pronunciation"]) assert.ok(dashboard.includes(`label: "${label}"`));
   assert.ok(form.includes('hasRedflagComponent ? "Redflag" : overallPercent > 80 ? "Good" : "Average"'));
-  assert.ok(form.includes('label="PATTERN"'));
-  assert.ok(form.includes('label="FREESTYLE"'));
+  assert.ok(form.includes("CambridgeEvaluationMatrix"));
+  assert.ok(form.includes("Pattern {Math.round(patternPercent)}%"));
+  assert.ok(form.includes("Free {Math.round(freestylePercent)}%"));
+});
+
+test("Cambridge matrix reads legacy checks and scores Pattern and Free independently", () => {
+  const legacy = normalizeCambridgeEvaluation({ pronunciation: "clear", oneOrMany: "correct", amIsAre: "incorrect" });
+  assert.deepEqual(legacy.pattern, legacy.free);
+  assert.equal(Math.round(cambridgeColumnPercent(legacy.pattern)), 67);
+  const current = normalizeCambridgeEvaluation({
+    pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" },
+    free: { pronunciation: "unclear", oneOrMany: "incorrect", amIsAre: "correct" },
+  });
+  assert.equal(cambridgeColumnPercent(current.pattern), 100);
+  assert.equal(Math.round(cambridgeColumnPercent(current.free)), 33);
 });
 
 test("Class editor exposes multiple teacher assignments", () => {

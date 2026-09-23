@@ -140,14 +140,14 @@ test("All three roles can create/edit observations; notes and observer survive u
 });
 
 test("Rolling history keeps 48 weeks, loads more than 300 records and prunes week 49", async () => {
-  const window = studentHistoryWindow("2026-09-18");
-  assert.deepEqual(window, { startDate: "2025-10-20", endDate: "2026-09-20", endExclusive: "2026-09-21", currentWeekStart: "2026-09-14" });
+  assert.deepEqual(studentHistoryWindow("2026-09-18"), { startDate: "2025-10-20", endDate: "2026-09-20", endExclusive: "2026-09-21", currentWeekStart: "2026-09-14" });
+  const window = studentHistoryWindow(vietnamToday());
   const insert = sqlite.prepare("INSERT INTO learning_checks(student_id,class_id,program_code,program_label,unit_number,unit_label,teacher_name,checked_at,evaluation_json,overall_score,result) VALUES(?,1,'FLYERS','Flyers',1,'Unit 1','AL',?,'{}',3,'Average')");
   for (let i = 0; i < 310; i++) insert.run(1, addDays(window.startDate, i));
-  insert.run(1, "2025-10-19"); insert.run(1, window.endExclusive); insert.run(2, "2026-09-18");
+  insert.run(1, addDays(window.startDate, -1)); insert.run(1, window.endExclusive); insert.run(2, vietnamToday());
   sqlite.exec("INSERT INTO student_assessments(student_id,class_id,evaluator_name,overall_score,result,checked_at,summary) VALUES(1,1,'Old AL',3,'Đạt','2026-09-18','Older notes')");
-  sqlite.exec("INSERT INTO student_assessments(student_id,class_id,evaluator_name,overall_score,result,checked_at,summary) VALUES(1,1,'Old AL',3,'Đạt','2025-10-19','Expired notes')");
-  sqlite.exec("INSERT INTO student_check_queue(student_id,class_id,scheduled_date,status,created_by) VALUES(1,1,'2025-10-19','completed','AL'),(2,1,'2025-10-19','pending','AL')");
+  sqlite.prepare("INSERT INTO student_assessments(student_id,class_id,evaluator_name,overall_score,result,checked_at,summary) VALUES(1,1,'Old AL',3,'Đạt',?,'Expired notes')").run(addDays(window.startDate, -1));
+  sqlite.prepare("INSERT INTO student_check_queue(student_id,class_id,scheduled_date,status,created_by) VALUES(1,1,?,'completed','AL'),(2,1,?,'pending','AL')").run(addDays(window.startDate, -1), addDays(window.startDate, -1));
   for (const role of ["admin", "academic_manager", "academic_leader"]) {
     const saved = await history.POST(req("/api/student-history", role, { studentId: 1, startDate: "2026-09-18" }));
     assert.equal(saved.status, 405);
@@ -189,7 +189,7 @@ test("Academic payload includes observations and does not overwrite custom curri
   assert.deepEqual(data.freestyleBanks.find((bank) => bank.programCode === "FLYERS").categories, []);
 
   const blockedQuestions = ["Mover A?", "Mover B?", "Mover C?", "Mover D?", "Mover E?"];
-  const blocked = await academic.POST(req("/api/academic", "academic_leader", { action: "createLearningCheck", studentId: 2, programCode: "MOVERS", unitNumber: 1, checkedAt: "2026-09-18", notes: "", feedback: [], evaluation: { patternPercent: 90, freestylePercent: 90, pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct", freestyleQuestions: blockedQuestions } }));
+  const blocked = await academic.POST(req("/api/academic", "academic_leader", { action: "createLearningCheck", studentId: 2, programCode: "MOVERS", unitNumber: 1, checkedAt: "2026-09-18", notes: "", feedback: [], evaluation: { pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" }, free: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" }, freestyleQuestions: blockedQuestions } }));
   assert.equal(blocked.status, 400);
   assert.match((await blocked.json()).error, /cần ít nhất 5 câu/);
 
@@ -234,11 +234,16 @@ test("A class can assign multiple teachers and keeps the previous teacher after 
 
 test("Saving and editing a student check updates its rolling history without duplicate records", async () => {
   const questions = ["Flyers question A?", "Flyers question B?", "Flyers question C?", "Flyers question D?", "Flyers question E?"];
-  const body = { action: "createLearningCheck", studentId: 1, programCode: "FLYERS", unitNumber: 2, checkedAt: "2026-09-18", notes: "Weekly feedback", feedback: [], evaluation: { patternPercent: 90, freestylePercent: 90, pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct", freestyleQuestions: questions } };
+  const body = { action: "createLearningCheck", studentId: 1, programCode: "FLYERS", unitNumber: 2, checkedAt: "2026-09-18", notes: "Weekly feedback", feedback: [], evaluation: { pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" }, free: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "incorrect" }, freestyleQuestions: questions } };
   const created = await academic.POST(req("/api/academic", "academic_leader", body));
   assert.equal(created.status, 201, await created.clone().text());
   const { item } = await created.json();
   assert.equal(item.result, "Good");
+  const savedEvaluation = JSON.parse(sqlite.prepare("SELECT evaluation_json AS evaluationJson FROM learning_checks WHERE id=?").get(item.id).evaluationJson);
+  assert.deepEqual(savedEvaluation.pattern, body.evaluation.pattern);
+  assert.deepEqual(savedEvaluation.free, body.evaluation.free);
+  assert.equal(savedEvaluation.patternPercent, 100);
+  assert.equal(Math.round(savedEvaluation.freestylePercent), 67);
   const countBefore = sqlite.prepare("SELECT count(*) AS n FROM learning_checks").get().n;
   const updated = await academic.POST(req("/api/academic", "academic_manager", { ...body, action: "updateLearningCheck", id: item.id, checkedAt: "2026-09-13", notes: "Updated feedback" }));
   assert.equal(updated.status, 200, await updated.clone().text());
@@ -247,7 +252,7 @@ test("Saving and editing a student check updates its rolling history without dup
   const check = result.learningChecks.find((row) => row.id === item.id);
   assert.equal(check.notes, "Updated feedback");
   assert.equal(check.teacherName, "Test academic_leader");
-  assert.equal(build48Weeks(result.startDate, [check])[46].records[0].id, item.id);
+  assert.equal(build48Weeks(result.startDate, [check]).find((week) => week.records.some((record) => record.id === item.id)).records[0].id, item.id);
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, checkedAt: "2026-02-30" }))).status, 400);
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, checkedAt: "2025-10-19" }))).status, 400);
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, evaluation: { ...body.evaluation, freestyleQuestions: ["Only one?"] } }))).status, 400);

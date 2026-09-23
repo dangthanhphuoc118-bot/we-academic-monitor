@@ -9,6 +9,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Khung chương trình Baby Stars, Super Kids 1–8, Starters, Movers và Flyers.
 - Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
+- Phiếu Starters/Movers/Flyers hiển thị Freestyle theo hai cột YES/NO và WH QUESTIONS; phần chấm dùng ma trận Pattern–Free cho Pronunciation, One/Many và Am/Is/Are.
 - Mở phiếu kiểm tra trực tiếp từ từng học viên trong danh sách lớp.
 - Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp; lớp không còn gắn cứng với một trình độ.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
@@ -38,7 +39,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 ## Hướng dẫn nhanh
 
-**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật ngày 18/09/2026](HUONG-DAN-CAP-NHAT-18-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
+**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật ngày 23/09/2026](HUONG-DAN-CAP-NHAT-23-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
 
 Toàn bộ hướng dẫn từng bước nằm trong file [HUONG-DAN-SETUP.md](HUONG-DAN-SETUP.md).
 

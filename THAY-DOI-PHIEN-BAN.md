@@ -1,3 +1,17 @@
+# Thay đổi phiên bản ngày 23/09/2026
+
+- Thiết kế lại giao diện theo phong cách tối giản, hiện đại với nền trung tính, màu xanh giáo dục và các khối nội dung nhẹ hơn.
+- Freestyle trên phiếu Starters, Movers và Flyers được trình bày thành bảng hai cột **YES / NO** và **WH QUESTIONS**.
+- Chuyển phần đánh giá Cambridge sang ma trận hai cột **Pattern** và **Free**, ba hàng **Pronunciation**, **One / Many**, **Am / Is / Are**.
+- Pronunciation dùng lựa chọn Clear/Unclear; One/Many và Am/Is/Are dùng Correct/Incorrect cho từng cột.
+- API tự tính phần trăm Pattern/Free từ ma trận và không tin điểm phần trăm nhập từ trình duyệt; dữ liệu cũ vẫn được đọc tương thích.
+- Báo cáo học viên và lịch sử 48 tuần hiển thị cùng ma trận Pattern–Free như phiếu nhập.
+- Vocabulary 5 nhóm được gom thành bảng thẻ/chip gọn, giảm chiều cao và dễ quét nội dung hơn.
+- Không thêm migration mới và không xóa dữ liệu D1 trong lần cập nhật giao diện này.
+- 18/18 kiểm thử API/migration/giao diện đạt.
+
+---
+
 # Thay đổi phiên bản ngày 19/09/2026
 
 - Chuyển Freestyle từ từng Unit thành một ngân hàng chung cho toàn bộ level Starters, Movers hoặc Flyers.
