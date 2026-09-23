@@ -19,38 +19,38 @@
 }
 
 :root {
-  --background: #f3f6f8;
-  --foreground: #102233;
+  --background: #f7f9fc;
+  --foreground: #172b3f;
   --card: #ffffff;
-  --card-foreground: #102233;
+  --card-foreground: #172b3f;
   --popover: #ffffff;
-  --popover-foreground: #102233;
-  --primary: #0b5c75;
+  --popover-foreground: #172b3f;
+  --primary: #143b63;
   --primary-foreground: #ffffff;
-  --secondary: #e4f1f4;
-  --secondary-foreground: #0b5368;
-  --muted: #eaf0f3;
-  --muted-foreground: #617586;
-  --accent: #fff0e7;
-  --accent-foreground: #a84418;
-  --destructive: #d33f49;
-  --border: #d8e2e8;
-  --input: #cddae1;
-  --ring: #2bb5c8;
-  --chart-1: #0b5c75;
-  --chart-2: #2bb5c8;
-  --chart-3: #ff7a3d;
-  --chart-4: #f2bd3d;
-  --chart-5: #d33f49;
-  --radius: 0.85rem;
-  --sidebar: #0b2033;
+  --secondary: #eaf2f8;
+  --secondary-foreground: #143b63;
+  --muted: #eef3f7;
+  --muted-foreground: #64778a;
+  --accent: #edf5fb;
+  --accent-foreground: #143b63;
+  --destructive: #c83e4d;
+  --border: #dfe7ee;
+  --input: #cfdae4;
+  --ring: #4a90c2;
+  --chart-1: #143b63;
+  --chart-2: #4a90c2;
+  --chart-3: #4ba88f;
+  --chart-4: #d49b3f;
+  --chart-5: #c83e4d;
+  --radius: 0.75rem;
+  --sidebar: #102a45;
   --sidebar-foreground: #dce8ef;
-  --sidebar-primary: #ff7a3d;
+  --sidebar-primary: #4a90c2;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #16364e;
+  --sidebar-accent: #1b4165;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #24455d;
-  --sidebar-ring: #2bb5c8;
+  --sidebar-border: #294d6d;
+  --sidebar-ring: #6bb2df;
 }
 
 @theme inline {
@@ -89,7 +89,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: "Segoe UI", Inter, Arial, Helvetica, sans-serif;
+  --font-sans: Inter, "Segoe UI", Arial, Helvetica, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 }
@@ -110,11 +110,29 @@ textarea {
 }
 
 ::selection {
-  background: #bdeaf0;
-  color: #102233;
+  background: #d4e8f5;
+  color: #143b63;
 }
 
 .academic-grid {
-  background-image: radial-gradient(circle at 1px 1px, rgba(11, 92, 117, 0.08) 1px, transparent 0);
-  background-size: 22px 22px;
+  background-image:
+    radial-gradient(circle at 8% 0%, rgba(74, 144, 194, 0.08), transparent 28rem),
+    radial-gradient(circle at 100% 100%, rgba(75, 168, 143, 0.06), transparent 32rem);
+  background-attachment: fixed;
+}
+
+[data-slot="card"] {
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 2px rgba(20, 59, 99, 0.04), 0 8px 24px rgba(20, 59, 99, 0.045) !important;
+}
+
+[data-slot="button"] {
+  border-radius: 0.625rem;
+}
+
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="select-trigger"] {
+  background: #ffffff;
+  box-shadow: none !important;
 }

@@ -106,11 +106,11 @@ export function LoginScreen({
   };
 
   return (
-    <main className="academic-grid grid min-h-screen place-items-center bg-[#f3f6f8] p-4">
+    <main className="academic-grid grid min-h-screen place-items-center bg-background p-4">
       <Card className="w-full max-w-md overflow-hidden border-0 shadow-[0_24px_70px_rgba(18,48,67,0.16)]">
-        <div className="h-2 bg-gradient-to-r from-[#0b6476] via-[#2bb5c8] to-[#ff7a3d]" />
+        <div className="h-2 bg-gradient-to-r from-[#143b63] via-[#4a90c2] to-[#4ba88f]" />
         <CardHeader className="items-center pb-3 pt-8 text-center">
-          <div className="mb-3 grid size-14 place-items-center rounded-2xl bg-[#ff7a3d] text-white shadow-lg shadow-orange-950/20">
+          <div className="mb-3 grid size-14 place-items-center rounded-2xl bg-[#4a90c2] text-white shadow-lg shadow-sky-950/20">
             <BookOpenCheck className="size-7" />
           </div>
           <CardTitle className="text-2xl text-[#102233]">Đăng nhập WE Academic</CardTitle>
@@ -166,7 +166,7 @@ export function LoginScreen({
               {error ? (
                 <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
               ) : null}
-              <Button type="submit" className="w-full bg-[#ff7a3d] hover:bg-[#e9652f]" disabled={submitting}>
+              <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? <LoaderCircle className="animate-spin" /> : <LogIn />}
                 Đăng nhập
               </Button>
@@ -204,7 +204,7 @@ export function AccountManager() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.15em] text-[#d95c25]">Admin</p>
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.15em] text-[#2f6f9f]">Admin</p>
           <h1 className="text-2xl font-bold tracking-tight text-[#102233] sm:text-3xl">Tài khoản đăng nhập</h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
             Tạo email, cấp mã PIN, phân quyền hoặc tạm khóa tài khoản.

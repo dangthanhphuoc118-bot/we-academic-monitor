@@ -20,6 +20,11 @@ import {
 } from "@/db/schema";
 import { curriculumDefaults, curriculumKey, programs } from "@/lib/curriculum";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  cambridgeColumnPercent,
+  isCompleteCambridgeEvaluation,
+  normalizeCambridgeEvaluation,
+} from "@/lib/cambridge-evaluation";
 import { validDate } from "@/lib/weekly-history";
 import { isInStudentHistoryWindow, pruneExpiredStudentHistory } from "@/lib/history-retention";
 import {
@@ -617,14 +622,9 @@ export async function POST(request: Request) {
         componentPercentages = [vocabularyPercent, communicationPercent];
         hasRedflagComponent = vocabularyPercent < 70 || communicationPercent < 60;
       } else {
-        const pronunciation = text(evaluation.pronunciation);
-        if (!['clear', 'unclear'].includes(pronunciation)) {
-          return fail("Vui lòng chọn kết quả phát âm Clear hoặc Unclear.");
-        }
-        const oneOrMany = text(evaluation.oneOrMany);
-        const amIsAre = text(evaluation.amIsAre);
-        if (!["correct", "incorrect"].includes(oneOrMany) || !["correct", "incorrect"].includes(amIsAre)) {
-          return fail("Vui lòng đánh giá đủ One or Many và Am – is – are.");
+        const matrix = normalizeCambridgeEvaluation(evaluation);
+        if (!isCompleteCambridgeEvaluation(matrix)) {
+          return fail("Vui lòng đánh giá đủ ma trận Pattern và Free.");
         }
         const freestyleQuestions = questionList(evaluation.freestyleQuestions);
         if (freestyleQuestions.length !== 5) {
@@ -652,9 +652,13 @@ export async function POST(request: Request) {
             return fail(`Có câu Freestyle không còn thuộc ngân hàng của level ${program.label}. Vui lòng chọn lại 5 câu.`);
           }
         }
+        evaluation.pattern = matrix.pattern;
+        evaluation.free = matrix.free;
         evaluation.freestyleQuestions = freestyleQuestions;
-        const patternPercent = clampPercent(evaluation.patternPercent);
-        const freestylePercent = clampPercent(evaluation.freestylePercent);
+        const patternPercent = cambridgeColumnPercent(matrix.pattern);
+        const freestylePercent = cambridgeColumnPercent(matrix.free);
+        evaluation.patternPercent = Math.round(patternPercent * 100) / 100;
+        evaluation.freestylePercent = Math.round(freestylePercent * 100) / 100;
         componentPercentages = [patternPercent, freestylePercent];
         hasRedflagComponent = patternPercent < 60 || freestylePercent < 60;
       }

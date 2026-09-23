@@ -17,7 +17,6 @@ import {
   SlidersHorizontal,
   Trash2,
   Volume2,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -33,11 +32,13 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cambridgeColumnPercent, isCompleteCambridgeEvaluation, normalizeCambridgeEvaluation, type CambridgeBinary, type CambridgePronunciation } from "@/lib/cambridge-evaluation";
 import { curriculumDefaults, curriculumKey, programByLabel, programs, type CurriculumUnit, type LearningCheck, type ProgramGroup } from "@/lib/curriculum";
 import {
   defaultFreestyleBanks,
   flattenFreestyleCategories,
-  sampleSpeakingQuestions,
+  sampleFreestyleQuestionsByType,
+  splitFreestyleQuestions,
   type FreestyleBank,
   type FreestyleQuestionCategory,
   type SpeakingProgramCode,
@@ -83,8 +84,25 @@ function PronunciationChoice({ value, onChange }: { value: string; onChange: (va
   return <div className="rounded-xl border bg-white p-4"><div className="flex items-center gap-2"><Volume2 className="size-4 text-[#0b5c75]" /><p className="text-sm font-semibold">Pronunciation (Ending sound)</p></div><RadioGroup value={value} onValueChange={onChange} className="mt-3 grid grid-cols-2 gap-3"><label className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-bold transition ${value === "clear" ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "hover:bg-slate-50"}`}><RadioGroupItem value="clear" className="sr-only" /><CheckCircle2 className="mx-auto mb-1 size-5" />CLEAR</label><label className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-bold transition ${value === "unclear" ? "border-amber-400 bg-amber-50 text-amber-800" : "hover:bg-slate-50"}`}><RadioGroupItem value="unclear" className="sr-only" /><Volume2 className="mx-auto mb-1 size-5" />UNCLEAR</label></RadioGroup></div>;
 }
 
-function BinaryChoice({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <div className="rounded-xl border bg-white p-4"><p className="text-sm font-semibold">{label}</p><RadioGroup value={value} onValueChange={onChange} className="mt-3 grid grid-cols-2 gap-3"><label className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-bold transition ${value === "correct" ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "hover:bg-slate-50"}`}><RadioGroupItem value="correct" className="sr-only" /><CheckCircle2 className="mx-auto mb-1 size-5" />ĐÚNG</label><label className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-bold transition ${value === "incorrect" ? "border-rose-400 bg-rose-50 text-rose-700" : "hover:bg-slate-50"}`}><RadioGroupItem value="incorrect" className="sr-only" /><X className="mx-auto mb-1 size-5" />SAI</label></RadioGroup></div>;
+function MatrixChoice({ label, value, onChange, pronunciation = false }: { label: string; value: string; onChange: (value: string) => void; pronunciation?: boolean }) {
+  const positive = pronunciation ? "clear" : "correct";
+  const negative = pronunciation ? "unclear" : "incorrect";
+  return <RadioGroup aria-label={label} value={value} onValueChange={onChange} className="grid min-w-48 grid-cols-2 gap-1.5"><label className={`cursor-pointer rounded-lg border px-2 py-2 text-center text-[11px] font-bold transition ${value === positive ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "bg-white text-slate-500 hover:bg-slate-50"}`}><RadioGroupItem value={positive} className="sr-only" />{pronunciation ? "CLEAR" : "CORRECT"}</label><label className={`cursor-pointer rounded-lg border px-2 py-2 text-center text-[11px] font-bold transition ${value === negative ? "border-rose-300 bg-rose-50 text-rose-700" : "bg-white text-slate-500 hover:bg-slate-50"}`}><RadioGroupItem value={negative} className="sr-only" />{pronunciation ? "UNCLEAR" : "INCORRECT"}</label></RadioGroup>;
+}
+
+function CambridgeEvaluationMatrix({ patternPronunciation, setPatternPronunciation, freePronunciation, setFreePronunciation, patternOneOrMany, setPatternOneOrMany, freeOneOrMany, setFreeOneOrMany, patternAmIsAre, setPatternAmIsAre, freeAmIsAre, setFreeAmIsAre }: {
+  patternPronunciation: string; setPatternPronunciation: (value: string) => void;
+  freePronunciation: string; setFreePronunciation: (value: string) => void;
+  patternOneOrMany: string; setPatternOneOrMany: (value: string) => void;
+  freeOneOrMany: string; setFreeOneOrMany: (value: string) => void;
+  patternAmIsAre: string; setPatternAmIsAre: (value: string) => void;
+  freeAmIsAre: string; setFreeAmIsAre: (value: string) => void;
+}) {
+  return <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[620px] border-collapse text-sm"><thead><tr className="bg-slate-50"><th className="w-40 border-b px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tiêu chí</th><th className="border-b px-3 py-3 text-left font-bold text-[#143b63]">Pattern</th><th className="border-b px-3 py-3 text-left font-bold text-[#143b63]">Free</th></tr></thead><tbody><tr><th className="border-b px-4 py-3 text-left font-semibold">Pronunciation</th><td className="border-b px-3 py-3"><MatrixChoice label="Pattern pronunciation" value={patternPronunciation} onChange={setPatternPronunciation} pronunciation /></td><td className="border-b px-3 py-3"><MatrixChoice label="Free pronunciation" value={freePronunciation} onChange={setFreePronunciation} pronunciation /></td></tr><tr><th className="border-b px-4 py-3 text-left font-semibold">One / Many</th><td className="border-b px-3 py-3"><MatrixChoice label="Pattern one or many" value={patternOneOrMany} onChange={setPatternOneOrMany} /></td><td className="border-b px-3 py-3"><MatrixChoice label="Free one or many" value={freeOneOrMany} onChange={setFreeOneOrMany} /></td></tr><tr><th className="px-4 py-3 text-left font-semibold">Am / Is / Are</th><td className="px-3 py-3"><MatrixChoice label="Pattern am is are" value={patternAmIsAre} onChange={setPatternAmIsAre} /></td><td className="px-3 py-3"><MatrixChoice label="Free am is are" value={freeAmIsAre} onChange={setFreeAmIsAre} /></td></tr></tbody></table></div>;
+}
+
+function FreestyleQuestionColumn({ title, questions, className = "" }: { title: string; questions: string[]; className?: string }) {
+  return <div className={`min-h-36 p-4 ${className}`}><div className="mb-3 flex items-center justify-between"><p className="text-xs font-bold tracking-[0.12em] text-[#143b63]">{title}</p><Badge variant="secondary" className="rounded-md">{questions.length}</Badge></div>{questions.length ? <ol className="space-y-2 pl-5 text-sm leading-6">{questions.map((question, index) => <li key={`${question}-${index}`} className="list-decimal pl-1">{question}</li>)}</ol> : <p className="text-sm text-muted-foreground">Không có câu thuộc nhóm này.</p>}</div>;
 }
 
 function parseObject(value?: string) {
@@ -116,6 +134,7 @@ type StudentCheckProps = {
 
 export function CurriculumStudentCheck({ classes, students, curriculum, freestyleBanks, levelOptions, feedbackOptions, selectedClassId, setSelectedClassId, selectedStudentId, setSelectedStudentId, onSaved, openFeedbackOptions, canManage = true, embedded = false, editingCheck = null, initialCheckedAt }: StudentCheckProps) {
   const initialEvaluation = parseObject(editingCheck?.evaluationJson);
+  const initialCambridge = normalizeCambridgeEvaluation(initialEvaluation);
   const initialFeedback = parseList(editingCheck?.feedbackJson);
   const filteredStudents = students.filter((student) => !selectedClassId || String(student.classId) === selectedClassId);
   const student = students.find((item) => String(item.id) === selectedStudentId);
@@ -126,8 +145,11 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
   const programUnits = curriculum.filter((unit) => unit.programCode === program?.code);
   const speakingProgramCode = program?.group === "cambridge" ? program.code as SpeakingProgramCode : null;
   const freestyleBank = speakingProgramCode ? freestyleBanks.find((bank) => bank.programCode === speakingProgramCode) : undefined;
+  const levelFreestyleCategories = speakingProgramCode
+    ? freestyleBank?.categories ?? defaultFreestyleBanks[speakingProgramCode]
+    : [];
   const levelFreestyleQuestions = speakingProgramCode
-    ? flattenFreestyleCategories(freestyleBank?.categories ?? defaultFreestyleBanks[speakingProgramCode])
+    ? flattenFreestyleCategories(levelFreestyleCategories)
     : [];
   const [unitNumber, setUnitNumber] = useState(editingCheck ? String(editingCheck.unitNumber) : (programUnits[0] ? String(programUnits[0].unitNumber) : ""));
   const unit = programUnits.find((item) => String(item.unitNumber) === unitNumber) ?? programUnits[0];
@@ -138,26 +160,35 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
   const [writingPercent, setWritingPercent] = useState(String(initialEvaluation.writingPercent ?? ""));
   const [vocabularyCorrect, setVocabularyCorrect] = useState(String(initialEvaluation.vocabularyCorrect ?? ""));
   const [communicationPercent, setCommunicationPercent] = useState(String(initialEvaluation.communicationPercent ?? ""));
-  const [patternPercent, setPatternPercent] = useState(String(initialEvaluation.patternPercent ?? ""));
-  const [freestylePercent, setFreestylePercent] = useState(String(initialEvaluation.freestylePercent ?? ""));
   const [pronunciation, setPronunciation] = useState(String(initialEvaluation.pronunciation ?? ""));
-  const [oneOrMany, setOneOrMany] = useState(String(initialEvaluation.oneOrMany ?? ""));
-  const [amIsAre, setAmIsAre] = useState(String(initialEvaluation.amIsAre ?? ""));
+  const [patternPronunciation, setPatternPronunciation] = useState<string>(initialCambridge.pattern.pronunciation);
+  const [freePronunciation, setFreePronunciation] = useState<string>(initialCambridge.free.pronunciation);
+  const [patternOneOrMany, setPatternOneOrMany] = useState<string>(initialCambridge.pattern.oneOrMany);
+  const [freeOneOrMany, setFreeOneOrMany] = useState<string>(initialCambridge.free.oneOrMany);
+  const [patternAmIsAre, setPatternAmIsAre] = useState<string>(initialCambridge.pattern.amIsAre);
+  const [freeAmIsAre, setFreeAmIsAre] = useState<string>(initialCambridge.free.amIsAre);
   const savedFreestyleQuestions = Array.isArray(initialEvaluation.freestyleQuestions) ? initialEvaluation.freestyleQuestions.filter((item): item is string => typeof item === "string") : [];
-  const [freestyleQuestions, setFreestyleQuestions] = useState<string[]>(savedFreestyleQuestions.length ? savedFreestyleQuestions : program?.group === "cambridge" ? sampleSpeakingQuestions(levelFreestyleQuestions) : []);
+  const [freestyleQuestions, setFreestyleQuestions] = useState<string[]>(savedFreestyleQuestions.length ? savedFreestyleQuestions : program?.group === "cambridge" ? sampleFreestyleQuestionsByType(levelFreestyleCategories) : []);
   const [saving, setSaving] = useState(false);
 
   const resetEvaluation = () => {
-    setSpellingPercent(""); setWritingPercent(""); setVocabularyCorrect(""); setCommunicationPercent(""); setPatternPercent(""); setFreestylePercent(""); setPronunciation(""); setOneOrMany(""); setAmIsAre(""); setNotes(""); setSelectedFeedbackIds([]);
-    setFreestyleQuestions(program?.group === "cambridge" ? sampleSpeakingQuestions(levelFreestyleQuestions) : []);
+    setSpellingPercent(""); setWritingPercent(""); setVocabularyCorrect(""); setCommunicationPercent(""); setPronunciation(""); setPatternPronunciation(""); setFreePronunciation(""); setPatternOneOrMany(""); setFreeOneOrMany(""); setPatternAmIsAre(""); setFreeAmIsAre(""); setNotes(""); setSelectedFeedbackIds([]);
+    setFreestyleQuestions(program?.group === "cambridge" ? sampleFreestyleQuestionsByType(levelFreestyleCategories) : []);
   };
 
   const percent = (value: string) => Math.min(100, Math.max(0, Number(value) || 0));
   const vocabularyPercent = unit?.vocabularyMax ? (Math.min(unit.vocabularyMax, Math.max(0, Number(vocabularyCorrect) || 0)) / unit.vocabularyMax) * 100 : 0;
-  const overallPercent = !program ? 0 : program.group === "baby" ? (percent(spellingPercent) + percent(writingPercent)) / 2 : program.group === "super" ? (vocabularyPercent + percent(communicationPercent)) / 2 : (percent(patternPercent) + percent(freestylePercent)) / 2;
-  const complete = program?.group === "baby" ? spellingPercent !== "" && writingPercent !== "" : program?.group === "super" ? vocabularyCorrect !== "" && communicationPercent !== "" && Boolean(pronunciation) : freestyleQuestions.length === 5 && patternPercent !== "" && freestylePercent !== "" && Boolean(pronunciation) && Boolean(oneOrMany) && Boolean(amIsAre);
-  const hasRedflagComponent = program?.group === "baby" ? percent(spellingPercent) < 50 || percent(writingPercent) < 50 : program?.group === "super" ? vocabularyPercent < 70 || percent(communicationPercent) < 60 : percent(patternPercent) < 60 || percent(freestylePercent) < 60;
+  const cambridgeEvaluation = {
+    pattern: { pronunciation: patternPronunciation as CambridgePronunciation | "", oneOrMany: patternOneOrMany as CambridgeBinary | "", amIsAre: patternAmIsAre as CambridgeBinary | "" },
+    free: { pronunciation: freePronunciation as CambridgePronunciation | "", oneOrMany: freeOneOrMany as CambridgeBinary | "", amIsAre: freeAmIsAre as CambridgeBinary | "" },
+  };
+  const patternPercent = cambridgeColumnPercent(cambridgeEvaluation.pattern);
+  const freestylePercent = cambridgeColumnPercent(cambridgeEvaluation.free);
+  const overallPercent = !program ? 0 : program.group === "baby" ? (percent(spellingPercent) + percent(writingPercent)) / 2 : program.group === "super" ? (vocabularyPercent + percent(communicationPercent)) / 2 : (patternPercent + freestylePercent) / 2;
+  const complete = program?.group === "baby" ? spellingPercent !== "" && writingPercent !== "" : program?.group === "super" ? vocabularyCorrect !== "" && communicationPercent !== "" && Boolean(pronunciation) : freestyleQuestions.length === 5 && isCompleteCambridgeEvaluation(cambridgeEvaluation);
+  const hasRedflagComponent = program?.group === "baby" ? percent(spellingPercent) < 50 || percent(writingPercent) < 50 : program?.group === "super" ? vocabularyPercent < 70 || percent(communicationPercent) < 60 : patternPercent < 60 || freestylePercent < 60;
   const previewResult = !complete ? "Chưa đủ dữ liệu" : hasRedflagComponent ? "Redflag" : overallPercent > 80 ? "Good" : "Average";
+  const groupedFreestyleQuestions = splitFreestyleQuestions(freestyleQuestions, levelFreestyleCategories);
 
   const save = async () => {
     if (!student || !program || !unit || !complete) return;
@@ -165,7 +196,7 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
       ? { spellingPercent: Number(spellingPercent), writingPercent: Number(writingPercent) }
       : program.group === "super"
         ? { vocabularyCorrect: Number(vocabularyCorrect), vocabularyMax: unit.vocabularyMax, communicationPercent: Number(communicationPercent), pronunciation }
-        : { patternPercent: Number(patternPercent), freestylePercent: Number(freestylePercent), pronunciation, oneOrMany, amIsAre, freestyleQuestions };
+        : { pattern: cambridgeEvaluation.pattern, free: cambridgeEvaluation.free, freestyleQuestions };
     const preservedFeedback = initialFeedback.filter((label) => !feedbackOptions.some((option) => option.label === label));
     const feedback = Array.from(new Set([...preservedFeedback, ...feedbackOptions.filter((item) => selectedFeedbackIds.includes(item.id)).map((item) => item.label)]));
     setSaving(true);
@@ -181,14 +212,14 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
   };
 
   return <div className="space-y-6">
-    {!embedded ? <div><p className="mb-1 text-xs font-bold uppercase tracking-[0.15em] text-[#d95c25]">Teacher Evaluation</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Đánh giá tình hình học viên</h1><p className="mt-1 text-sm leading-6 text-muted-foreground">Nội dung và tiêu chí thay đổi tự động theo chương trình của học viên.</p></div> : null}
+    {!embedded ? <div><p className="mb-1 text-xs font-bold uppercase tracking-[0.15em] text-[#2f6f9f]">Teacher Evaluation</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Đánh giá tình hình học viên</h1><p className="mt-1 text-sm leading-6 text-muted-foreground">Nội dung và tiêu chí thay đổi tự động theo chương trình của học viên.</p></div> : null}
     {embedded ? <Card className="border-0 bg-slate-50 shadow-none"><CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,1fr)]"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Học viên đã chọn</p><p className="mt-1 font-bold text-[#102233]">{student?.name}</p><p className="text-sm text-muted-foreground">{classInfo?.name || "Chưa xếp lớp"} · {student?.level}</p></div><div><Label className="mb-2">Nội dung kiểm tra</Label><Picker value={unit ? String(unit.unitNumber) : ""} onChange={(value) => { setUnitNumber(value); resetEvaluation(); }} placeholder="Chọn unit / ngày" disabled={!program || Boolean(editingCheck)} options={programUnits.map((item) => ({ value: String(item.unitNumber), label: `${item.unitLabel} · ${item.topic}` }))} /></div></CardContent></Card> : <Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardContent className="grid gap-4 p-5 lg:grid-cols-3"><div><Label className="mb-2">1. Lớp học</Label><Picker value={selectedClassId} onChange={(value) => { setSelectedClassId(value); resetEvaluation(); setSelectedStudentId(""); }} placeholder="Chọn lớp" options={classes.map((item) => ({ value: String(item.id), label: item.name }))} /></div><div><Label className="mb-2">2. Học viên</Label><Picker value={selectedStudentId} onChange={(value) => { resetEvaluation(); setSelectedStudentId(value); }} placeholder="Chọn học viên" disabled={!selectedClassId} options={filteredStudents.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.level}` }))} /></div><div><Label className="mb-2">3. Nội dung kiểm tra</Label><Picker value={unit ? String(unit.unitNumber) : ""} onChange={(value) => { setUnitNumber(value); resetEvaluation(); }} placeholder="Chọn unit / ngày" disabled={!program} options={programUnits.map((item) => ({ value: String(item.unitNumber), label: `${item.unitLabel} · ${item.topic}` }))} /></div></CardContent></Card>}
     {student && !program ? <EmptyBox title="Chưa xác định đúng chương trình" description={`Học viên đang được đặt trình độ “${student.level}”. Hãy chỉnh thành Baby Stars, Super Kids 1–8, Starters, Movers hoặc Flyers.`} /> : null}
     {student && program && unit ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,.75fr)]">
       <div className="space-y-5"><CurriculumReference unit={unit} /><Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="text-xl">Evaluation Criteria</CardTitle><p className="mt-1 text-sm text-muted-foreground">{student.name} · {classInfo?.name}</p></div><ProgramBadge group={program.group}>{program.label}</ProgramBadge></div></CardHeader><CardContent className="space-y-4 p-5">
         {program.group === "baby" ? <div className="grid gap-3 sm:grid-cols-2"><NumberScore id="spelling" label="SPELLING" value={spellingPercent} onChange={setSpellingPercent} /><NumberScore id="writing" label="WRITING" value={writingPercent} onChange={setWritingPercent} /></div> : null}
         {program.group === "super" ? <><NumberScore id="vocabulary" label="VOCABULARY" value={vocabularyCorrect} onChange={setVocabularyCorrect} max={unit.vocabularyMax || 10} suffix={`/ ${unit.vocabularyMax || 10}`} /><NumberScore id="communication" label="COMMUNICATION" value={communicationPercent} onChange={setCommunicationPercent} /><PronunciationChoice value={pronunciation} onChange={setPronunciation} /></> : null}
-        {program.group === "cambridge" ? <><div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">COMMUNICATION</div><div className="rounded-xl border bg-white p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold">FREESTYLE QUESTIONS</p><p className="mt-1 text-xs text-muted-foreground">5 câu được chọn ngẫu nhiên từ ngân hàng chung của level {program.label}.</p></div><Button type="button" size="sm" variant="outline" disabled={levelFreestyleQuestions.length < 5 || Boolean(editingCheck)} onClick={() => setFreestyleQuestions(sampleSpeakingQuestions(levelFreestyleQuestions))}><RefreshCw /> Đổi 5 câu</Button></div>{freestyleQuestions.length === 5 ? <ol className="mt-3 space-y-2 pl-5 text-sm leading-6">{freestyleQuestions.map((question, index) => <li key={`${question}-${index}`} className="list-decimal">{question}</li>)}</ol> : <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Ngân hàng của level {program.label} chưa đủ 5 câu. Hãy bổ sung tại Khung chương trình trước khi kiểm tra.</p>}</div><div className="grid gap-3 sm:grid-cols-2"><NumberScore id="pattern" label="PATTERN" value={patternPercent} onChange={setPatternPercent} /><NumberScore id="freestyle" label="FREESTYLE" value={freestylePercent} onChange={setFreestylePercent} /></div><PronunciationChoice value={pronunciation} onChange={setPronunciation} /><div className="grid gap-3 sm:grid-cols-2"><BinaryChoice label="ONE OR MANY" value={oneOrMany} onChange={setOneOrMany} /><BinaryChoice label="AM – IS – ARE" value={amIsAre} onChange={setAmIsAre} /></div></> : null}
+        {program.group === "cambridge" ? <><div className="rounded-lg bg-sky-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-sky-800">Communication</div><div className="overflow-hidden rounded-xl border bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"><div><p className="text-sm font-bold">Freestyle questions</p><p className="mt-0.5 text-xs text-muted-foreground">5 câu từ ngân hàng chung của level {program.label}, phân theo dạng câu hỏi.</p></div><Button type="button" size="sm" variant="outline" disabled={levelFreestyleQuestions.length < 5 || Boolean(editingCheck)} onClick={() => setFreestyleQuestions(sampleFreestyleQuestionsByType(levelFreestyleCategories))}><RefreshCw /> Đổi 5 câu</Button></div>{freestyleQuestions.length === 5 ? <div className="grid md:grid-cols-2"><FreestyleQuestionColumn title="YES / NO" questions={groupedFreestyleQuestions.yesNo} /><FreestyleQuestionColumn title="WH QUESTIONS" questions={groupedFreestyleQuestions.wh} className="border-t md:border-l md:border-t-0" /></div> : <p className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Ngân hàng của level {program.label} chưa đủ 5 câu. Hãy bổ sung tại Khung chương trình trước khi kiểm tra.</p>}</div><div><div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-sm font-bold">Evaluation matrix</p><p className="text-xs text-muted-foreground">Đánh giá riêng Pattern và Free theo từng tiêu chí.</p></div><div className="flex gap-2 text-xs"><Badge variant="outline">Pattern {Math.round(patternPercent)}%</Badge><Badge variant="outline">Free {Math.round(freestylePercent)}%</Badge></div></div><CambridgeEvaluationMatrix patternPronunciation={patternPronunciation} setPatternPronunciation={setPatternPronunciation} freePronunciation={freePronunciation} setFreePronunciation={setFreePronunciation} patternOneOrMany={patternOneOrMany} setPatternOneOrMany={setPatternOneOrMany} freeOneOrMany={freeOneOrMany} setFreeOneOrMany={setFreeOneOrMany} patternAmIsAre={patternAmIsAre} setPatternAmIsAre={setPatternAmIsAre} freeAmIsAre={freeAmIsAre} setFreeAmIsAre={setFreeAmIsAre} /></div></> : null}
       </CardContent></Card></div>
       <Card className="h-fit border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-lg">{editingCheck ? "Cập nhật kết quả" : "Kết quả kiểm tra"}</CardTitle><Badge variant="outline">{previewResult}</Badge></div></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="check-date">Ngày đánh giá</Label><Input id="check-date" type="date" value={checkedAt} onChange={(event) => setCheckedAt(event.target.value)} /></div><div className="space-y-3"><div className="flex items-center justify-between gap-3"><Label>Nhận xét thường gặp</Label>{canManage ? <Button type="button" size="sm" variant="ghost" onClick={openFeedbackOptions}><Settings2 /> Quản lý</Button> : null}</div>{feedbackOptions.filter((item) => item.active).length ? <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border bg-slate-50/70 p-3">{Array.from(new Set(feedbackOptions.filter((item) => item.active).map((item) => item.category))).map((category) => <div key={category}><p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{category}</p><div className="space-y-2">{feedbackOptions.filter((item) => item.active && item.category === category).map((item) => <label key={item.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-sm leading-5 shadow-sm"><Checkbox checked={selectedFeedbackIds.includes(item.id)} onCheckedChange={(checked) => setSelectedFeedbackIds((current) => checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span>{item.label}</span></label>)}</div></div>)}</div> : canManage ? <Button type="button" variant="outline" className="w-full" onClick={openFeedbackOptions}><Settings2 /> Thêm mẫu nhận xét</Button> : <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Chưa có mẫu nhận xét đang sử dụng.</p>}</div><div><Label htmlFor="check-notes">Nhận xét / lý do khác</Label><Textarea id="check-notes" value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} placeholder="Nhập nội dung khác ngoài các lựa chọn phía trên..." /></div><Button className="w-full bg-[#ff7a3d] hover:bg-[#e9652f]" disabled={!complete || saving} onClick={save}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />} {editingCheck ? "Cập nhật kết quả" : "Lưu đánh giá"}</Button></CardContent></Card>
     </div> : null}
@@ -207,7 +238,8 @@ function ReferenceBlock({ icon, title, content, itemized = false }: { icon: Reac
 
 function CurriculumBlocks({ unit }: { unit: CurriculumUnit }) {
   const groups = parseVocabularyGroups(unit.vocabulary);
-  return <div className="space-y-4">{groups.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">{groups.map((group) => <div key={group.label} className="rounded-xl border bg-slate-50/80 p-3"><p className="text-xs font-bold tracking-wide text-[#0b5c75]">{group.label}</p>{group.content ? <div className="mt-2 flex flex-wrap gap-1.5">{group.content.split(/\s+-\s+/).filter(Boolean).map((item, index) => <span key={`${item}-${index}`} className="rounded-md border bg-white px-2 py-1 text-xs leading-5 text-[#345064]">{item}</span>)}</div> : <p className="mt-2 text-xs text-muted-foreground">Không có nội dung</p>}</div>)}</div> : unit.vocabulary ? <ReferenceBlock icon={<Languages />} title="Vocabulary" content={unit.vocabulary} itemized /> : null}{unit.grammar ? <ReferenceBlock icon={<MessageCircle />} title={unit.group === "cambridge" ? "Communication" : "Grammar / Communication"} content={unit.grammar} /> : null}{unit.group === "baby" ? <ReferenceBlock icon={<BookOpen />} title="Lesson content" content={unit.content} /> : null}</div>;
+  const vocabularyTotal = groups.reduce((sum, group) => sum + group.content.split(/\s+-\s+/).filter(Boolean).length, 0);
+  return <div className="space-y-4">{groups.length ? <div className="overflow-hidden rounded-xl border bg-white"><div className="flex items-center justify-between border-b bg-slate-50/70 px-4 py-3"><div className="flex items-center gap-2 text-sm font-bold text-[#143b63]"><Languages className="size-4" /> Vocabulary</div><span className="text-xs text-muted-foreground">{vocabularyTotal} từ · {groups.length} nhóm</span></div><div className="grid md:grid-cols-2">{groups.map((group, groupIndex) => { const words = group.content.split(/\s+-\s+/).filter(Boolean); return <div key={group.label} className={`p-4 ${groupIndex > 0 ? "border-t" : ""} ${groupIndex % 2 === 1 ? "md:border-l" : ""} ${groupIndex === 1 ? "md:border-t-0" : ""}`}><div className="mb-2 flex items-center justify-between"><p className="text-xs font-bold tracking-[0.12em] text-[#143b63]">{group.label}</p><span className="text-[11px] text-muted-foreground">{words.length}</span></div>{words.length ? <div className="flex flex-wrap gap-1.5">{words.map((item, index) => <span key={`${item}-${index}`} className="rounded-md bg-slate-100 px-2 py-1 text-xs leading-5 text-slate-700">{item}</span>)}</div> : <p className="text-xs text-muted-foreground">Chưa có nội dung</p>}</div>; })}</div></div> : unit.vocabulary ? <ReferenceBlock icon={<Languages />} title="Vocabulary" content={unit.vocabulary} itemized /> : null}{unit.grammar ? <ReferenceBlock icon={<MessageCircle />} title={unit.group === "cambridge" ? "Communication" : "Grammar / Communication"} content={unit.grammar} /> : null}{unit.group === "baby" ? <ReferenceBlock icon={<BookOpen />} title="Lesson content" content={unit.content} /> : null}</div>;
 }
 
 export function CurriculumManager({ curriculum, freestyleBanks, onReload }: { curriculum: CurriculumUnit[]; freestyleBanks: FreestyleBank[]; onReload: () => Promise<void> | void }) {

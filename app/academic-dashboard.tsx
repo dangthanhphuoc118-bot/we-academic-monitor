@@ -46,6 +46,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { CurriculumManager, CurriculumStudentCheck, type FeedbackOption, type LevelOption } from "./curriculum-check";
+import { normalizeCambridgeEvaluation } from "@/lib/cambridge-evaluation";
 import { programs, type CurriculumUnit, type LearningCheck, type StudentCheckQueueItem } from "@/lib/curriculum";
 import type { FreestyleBank } from "@/lib/speaking-questions";
 import { AccountManager, LoginScreen, roleLabels, type CurrentUser } from "./auth-components";
@@ -65,7 +66,8 @@ type TeacherRow = { id: number; name: string; email: string; phone: string; spec
 type CriterionRow = { id: number; targetType: "student" | "teacher"; level: string; category: string; title: string; description: string; weight: number; active: number; sortOrder: number };
 type StudentAssessment = { id: number; studentId: number; studentName: string; classId: number | null; className: string | null; evaluatorName: string; overallScore: number; result: string; summary: string; actionPlan: string; checkedAt: string };
 type TeacherReview = { id: number; teacherId: number; teacherName: string; reviewerName: string; overallScore: number; result: string; summary: string; actionPlan: string; observedAt: string };
-type StudentProgressRecord = { id: number; studentId: number; studentName: string; classId: number | null; className: string | null; overallScore: number; result: string; checkedAt: string; source: "legacy" | "curriculum"; programLabel?: string; unitLabel?: string; teacherName?: string; reason: string; criteria: { label: string; value: string }[] };
+export type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string };
+type StudentProgressRecord = { id: number; studentId: number; studentName: string; classId: number | null; className: string | null; overallScore: number; result: string; checkedAt: string; source: "legacy" | "curriculum"; programLabel?: string; unitLabel?: string; teacherName?: string; reason: string; criteria: EvaluationCriterion[] };
 type AcademicData = { classes: ClassRow[]; students: StudentRow[]; teachers: TeacherRow[]; criteria: CriterionRow[]; studentAssessments: StudentAssessment[]; teacherReviews: TeacherReview[]; teacherObservations: TeacherObservation[]; curriculum: CurriculumUnit[]; freestyleBanks: FreestyleBank[]; learningChecks: LearningCheck[]; levelOptions: LevelOption[]; feedbackOptions: FeedbackOption[]; checkQueue: StudentCheckQueueItem[] };
 
 const emptyData: AcademicData = { classes: [], students: [], teachers: [], criteria: [], studentAssessments: [], teacherReviews: [], teacherObservations: [], curriculum: [], freestyleBanks: [], learningChecks: [], levelOptions: [], feedbackOptions: [], checkQueue: [] };
@@ -130,7 +132,7 @@ function SectionHeader({ eyebrow, title, description, action }: { eyebrow: strin
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.15em] text-[#d95c25]">{eyebrow}</p>
+        <p className="mb-1 text-xs font-bold uppercase tracking-[0.15em] text-[#2f6f9f]">{eyebrow}</p>
         <h1 className="text-2xl font-bold tracking-tight text-[#102233] sm:text-3xl">{title}</h1>
         {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
       </div>
@@ -316,7 +318,7 @@ export function AcademicDashboard() {
   };
 
   if (authLoading) {
-    return <main className="academic-grid grid min-h-screen place-items-center bg-[#f3f6f8]"><div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><LoaderCircle className="animate-spin" /> Đang kiểm tra đăng nhập...</div></main>;
+    return <main className="academic-grid grid min-h-screen place-items-center bg-background"><div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><LoaderCircle className="animate-spin" /> Đang kiểm tra đăng nhập...</div></main>;
   }
 
   if (!user) {
@@ -346,7 +348,7 @@ export function AcademicDashboard() {
       <Sidebar collapsible="offcanvas" className="border-r-0">
         <SidebarHeader className="p-5">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-[#ff7a3d] text-white shadow-lg shadow-orange-950/20"><BookOpenCheck className="size-5" /></div>
+            <div className="grid size-10 place-items-center rounded-xl bg-[#4a90c2] text-white shadow-lg shadow-sky-950/20"><BookOpenCheck className="size-5" /></div>
             <div><p className="text-sm font-bold tracking-wide text-white">WE ACADEMIC</p><p className="text-xs text-slate-400">Learning Monitor</p></div>
           </div>
         </SidebarHeader>
@@ -356,10 +358,10 @@ export function AcademicDashboard() {
           <NavGroup label="Tổng hợp" items={visibleNavItems.filter((item) => item.section === "report")} current={view} onSelect={setView} />
         </SidebarContent>
         <SidebarFooter className="p-4">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3"><p className="truncate text-xs font-semibold text-white">{user.name}</p><p className="mt-1 truncate text-[11px] text-slate-400">{user.email}</p><p className="mt-1 text-xs font-semibold text-[#6fd4df]">{roleLabels[user.role]}</p></div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3"><p className="truncate text-xs font-semibold text-white">{user.name}</p><p className="mt-1 truncate text-[11px] text-slate-400">{user.email}</p><p className="mt-1 text-xs font-semibold text-[#8bc4e8]">{roleLabels[user.role]}</p></div>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="academic-grid min-w-0 bg-[#f3f6f8]">
+      <SidebarInset className="academic-grid min-w-0 bg-background">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b bg-white/90 px-4 backdrop-blur-md sm:px-7">
           <div className="flex items-center"><SidebarTrigger className="md:hidden" /></div>
           <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => void reload()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} /> Làm mới</Button><Button variant="ghost" size="sm" onClick={() => void logout()}><LogOut /> Đăng xuất</Button></div>
@@ -411,13 +413,24 @@ function evaluationCriteria(check: LearningCheck) {
     { label: "Communication", value: percent(evaluation.communicationPercent) },
     { label: "Pronunciation", value: choice(evaluation.pronunciation) },
   ];
+  const matrix = normalizeCambridgeEvaluation(evaluation);
   return [
-    { label: "Pattern", value: percent(evaluation.patternPercent) },
-    { label: "Freestyle", value: percent(evaluation.freestylePercent) },
-    { label: "Pronunciation", value: choice(evaluation.pronunciation) },
-    { label: "One or Many", value: choice(evaluation.oneOrMany) },
-    { label: "Am – Is – Are", value: choice(evaluation.amIsAre) },
+    { label: "Pattern · Pronunciation", criterion: "Pronunciation", category: "Pattern" as const, value: choice(matrix.pattern.pronunciation) },
+    { label: "Free · Pronunciation", criterion: "Pronunciation", category: "Free" as const, value: choice(matrix.free.pronunciation) },
+    { label: "Pattern · One / Many", criterion: "One / Many", category: "Pattern" as const, value: choice(matrix.pattern.oneOrMany) },
+    { label: "Free · One / Many", criterion: "One / Many", category: "Free" as const, value: choice(matrix.free.oneOrMany) },
+    { label: "Pattern · Am / Is / Are", criterion: "Am / Is / Are", category: "Pattern" as const, value: choice(matrix.pattern.amIsAre) },
+    { label: "Free · Am / Is / Are", criterion: "Am / Is / Are", category: "Free" as const, value: choice(matrix.free.amIsAre) },
   ];
+}
+
+function EvaluationCriteriaGrid({ criteria }: { criteria: EvaluationCriterion[] }) {
+  const matrix = criteria.some((item) => item.category);
+  if (!matrix) {
+    return <div className="mt-2 grid gap-2 sm:grid-cols-2">{criteria.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label}</span><strong>{criterion.value}</strong></div>)}</div>;
+  }
+  const rows = ["Pronunciation", "One / Many", "Am / Is / Are"];
+  return <div className="mt-2 overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div>;
 }
 
 function studentProgressRecords(data: AcademicData): StudentProgressRecord[] {
@@ -575,7 +588,7 @@ function ComparisonPieChart({ title, rows }: { title: string; rows: StudentProgr
 
 function StudentZone({ title, subtitle, rows, tone, onDelete, onEdit }: { title: string; subtitle: string; rows: { student: StudentRow; latest: StudentProgressRecord }[]; tone: "good" | "average" | "redflag"; onDelete: (item: StudentProgressRecord) => void; onEdit: (item: StudentProgressRecord) => void }) {
   const styles = { good: { border: "border-emerald-200", header: "bg-emerald-50 text-emerald-800", count: "bg-emerald-600" }, average: { border: "border-amber-200", header: "bg-amber-50 text-amber-900", count: "bg-amber-500" }, redflag: { border: "border-rose-200", header: "bg-rose-50 text-rose-800", count: "bg-rose-600" } }[tone];
-  return <Card className={`overflow-hidden border ${styles.border} shadow-[0_10px_30px_rgba(18,48,67,0.07)]`}><CardHeader className={styles.header}><div className="flex items-center justify-between gap-3"><div><CardTitle className="text-xl">{title}</CardTitle><p className="mt-1 text-sm opacity-80">{subtitle}</p></div><Badge className={`${styles.count} text-white`}>{rows.length}</Badge></div></CardHeader><CardContent className="p-4">{rows.length ? <div className="grid gap-3 lg:grid-cols-2">{rows.map(({ student, latest }) => <div key={student.id} className="rounded-xl border bg-white p-3"><div className="flex items-start gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-100 font-bold text-[#345064]">{student.name.charAt(0)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">{student.name}</p><ResultBadge value={latest.result} /></div><p className="mt-1 text-xs text-muted-foreground">{student.className || "Chưa xếp lớp"} · {student.level}</p><p className="mt-1 text-xs text-muted-foreground">{latest.programLabel ? `${latest.programLabel} · ${latest.unitLabel} · ` : ""}{formatDate(latest.checkedAt)}</p></div><div className="flex shrink-0 gap-1">{latest.source === "curriculum" ? <Button size="icon-sm" variant="ghost" onClick={() => onEdit(latest)} aria-label={`Cập nhật đánh giá của ${student.name}`}><Pencil /></Button> : null}<Button size="icon-sm" variant="ghost" className="text-destructive" onClick={() => onDelete(latest)} aria-label={`Xóa đánh giá của ${student.name}`}><Trash2 /></Button></div></div><div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Evaluation Criteria</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{latest.criteria.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label}</span><strong>{criterion.value}</strong></div>)}</div></div><div className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Nhận xét / lý do</p><p className="mt-1 whitespace-pre-line text-sm leading-5 text-[#345064]">{latest.reason || "Chưa có nhận xét hoặc lý do chi tiết."}</p></div></div>)}</div> : <p className="py-10 text-center text-sm text-muted-foreground">Chưa có học viên trong vùng này.</p>}</CardContent></Card>;
+  return <Card className={`overflow-hidden border ${styles.border} shadow-[0_10px_30px_rgba(18,48,67,0.07)]`}><CardHeader className={styles.header}><div className="flex items-center justify-between gap-3"><div><CardTitle className="text-xl">{title}</CardTitle><p className="mt-1 text-sm opacity-80">{subtitle}</p></div><Badge className={`${styles.count} text-white`}>{rows.length}</Badge></div></CardHeader><CardContent className="p-4">{rows.length ? <div className="grid gap-3 lg:grid-cols-2">{rows.map(({ student, latest }) => <div key={student.id} className="rounded-xl border bg-white p-3"><div className="flex items-start gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-100 font-bold text-[#345064]">{student.name.charAt(0)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">{student.name}</p><ResultBadge value={latest.result} /></div><p className="mt-1 text-xs text-muted-foreground">{student.className || "Chưa xếp lớp"} · {student.level}</p><p className="mt-1 text-xs text-muted-foreground">{latest.programLabel ? `${latest.programLabel} · ${latest.unitLabel} · ` : ""}{formatDate(latest.checkedAt)}</p></div><div className="flex shrink-0 gap-1">{latest.source === "curriculum" ? <Button size="icon-sm" variant="ghost" onClick={() => onEdit(latest)} aria-label={`Cập nhật đánh giá của ${student.name}`}><Pencil /></Button> : null}<Button size="icon-sm" variant="ghost" className="text-destructive" onClick={() => onDelete(latest)} aria-label={`Xóa đánh giá của ${student.name}`}><Trash2 /></Button></div></div><div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Evaluation Criteria</p><EvaluationCriteriaGrid criteria={latest.criteria} /></div><div className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Nhận xét / lý do</p><p className="mt-1 whitespace-pre-line text-sm leading-5 text-[#345064]">{latest.reason || "Chưa có nhận xét hoặc lý do chi tiết."}</p></div></div>)}</div> : <p className="py-10 text-center text-sm text-muted-foreground">Chưa có học viên trong vùng này.</p>}</CardContent></Card>;
 }
 
 function LearningCheckHistory({ checks, onEdit, onDelete }: { checks: LearningCheck[]; onEdit: (item: LearningCheck) => void; onDelete: (item: LearningCheck) => void }) {

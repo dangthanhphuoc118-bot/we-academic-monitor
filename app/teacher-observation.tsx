@@ -26,7 +26,7 @@ async function send(payload: Record<string, unknown>) {
 export function TeacherObservationView({ selectedTeacherId, ...props }: Props & { selectedTeacherId: string }) {
   const [generation, setGeneration] = useState(0);
   return <div className="space-y-7">
-    <div><p className="text-xs font-bold uppercase tracking-widest text-[#d95c25]">Academic Observation</p><h1 className="mt-1 text-3xl font-bold">Dự giờ & đánh giá giáo viên</h1><p className="mt-2 text-sm text-muted-foreground">Class Observation Form · Ghi nhận Academic và Attitude theo từng buổi dự giờ.</p></div>
+    <div><p className="text-xs font-bold uppercase tracking-widest text-[#2f6f9f]">Academic Observation</p><h1 className="mt-1 text-3xl font-bold">Dự giờ & đánh giá giáo viên</h1><p className="mt-2 text-sm text-muted-foreground">Class Observation Form · Ghi nhận Academic và Attitude theo từng buổi dự giờ.</p></div>
     <ObservationForm key={`${generation}-${selectedTeacherId}`} teachers={props.teachers} classes={props.classes} initialTeacherId={selectedTeacherId} onSaved={async () => { await props.onSaved(); setGeneration((value) => value + 1); }} />
     <ObservationHistory {...props} />
   </div>;

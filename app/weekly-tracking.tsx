@@ -19,6 +19,7 @@ type History = {
   legacy: Legacy[];
 };
 type WeeklyRecord = { id: number; checkedAt: string; createdAt?: string; result: string; check?: LearningCheck; legacy?: Legacy };
+type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string };
 const dateLabel = (value: string) => value.split("-").reverse().join("/");
 const selectStyle = "h-10 w-full rounded-lg border bg-white px-3 text-sm";
 const resultStyle = (result: string) => result === "Good" || result === "Tốt" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : result === "Average" || result === "Đạt" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-rose-200 bg-rose-50 text-rose-800";
@@ -26,10 +27,18 @@ const feedback = (json: string) => { try { const value = JSON.parse(json); retur
 const weekAge = (weekStart: string, currentWeekStart: string) =>
   Math.round((Date.parse(`${currentWeekStart}T00:00:00Z`) - Date.parse(`${weekStart}T00:00:00Z`)) / (7 * 24 * 60 * 60 * 1000));
 
+function HistoryCriteria({ criteria }: { criteria: EvaluationCriterion[] }) {
+  if (!criteria.some((item) => item.category)) {
+    return <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{criteria.map((item) => <div key={item.label} className="flex justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>;
+  }
+  const rows = ["Pronunciation", "One / Many", "Am / Is / Are"];
+  return <div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div>;
+}
+
 export function WeeklyTracking({ students, classes, revision, initialStudentId = "", onCheck, criteriaFor }: {
   students: Student[]; classes: { id: number; name: string }[]; revision: unknown; initialStudentId?: string;
   onCheck: (studentId: number, date: string, editingCheck?: LearningCheck) => void;
-  criteriaFor: (check: LearningCheck) => { label: string; value: string }[];
+  criteriaFor: (check: LearningCheck) => EvaluationCriterion[];
 }) {
   const [classId, setClassId] = useState("");
   const [studentId, setStudentId] = useState(initialStudentId);
@@ -69,7 +78,7 @@ export function WeeklyTracking({ students, classes, revision, initialStudentId =
   const chooseStudent = (value: string) => setStudentId(value);
 
   return <div className="space-y-6">
-    <div><p className="text-xs font-bold uppercase tracking-widest text-[#d95c25]">Student Journey</p><h1 className="mt-1 text-3xl font-bold">Theo dõi 48 tuần</h1><p className="mt-2 text-sm text-muted-foreground">Luôn hiển thị tuần hiện tại và 47 tuần trước đó, tính từ thứ Hai đến Chủ nhật. Khi sang tuần mới, tuần thứ 49 trong quá khứ được tự động xóa.</p></div>
+    <div><p className="text-xs font-bold uppercase tracking-widest text-[#2f6f9f]">Student Journey</p><h1 className="mt-1 text-3xl font-bold">Theo dõi 48 tuần</h1><p className="mt-2 text-sm text-muted-foreground">Luôn hiển thị tuần hiện tại và 47 tuần trước đó, tính từ thứ Hai đến Chủ nhật. Khi sang tuần mới, tuần thứ 49 trong quá khứ được tự động xóa.</p></div>
     <div className="grid gap-4 rounded-2xl bg-white p-5 sm:grid-cols-2">
       <label className="space-y-2 text-sm font-medium">Lớp học<select className={selectStyle} value={classId} onChange={(event) => { setClassId(event.target.value); chooseStudent(""); }}><option value="">Tất cả lớp</option><option value="unassigned">Chưa xếp lớp</option>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
       <label className="space-y-2 text-sm font-medium">Học viên<select className={selectStyle} value={studentId} onChange={(event) => chooseStudent(event.target.value)}><option value="">Chọn học viên</option>{students.filter((student) => !classId || (classId === "unassigned" ? student.classId === null : String(student.classId) === classId)).map((student) => <option value={student.id} key={student.id}>{student.name} · {student.level}</option>)}</select></label>
@@ -91,7 +100,7 @@ export function WeeklyTracking({ students, classes, revision, initialStudentId =
           <summary className="cursor-pointer"><span className="ml-1 inline-flex w-[calc(100%-1.5rem)] flex-wrap items-center justify-between gap-2 align-middle"><span><strong>{title}</strong><span className="ml-3 text-sm text-muted-foreground">{dateLabel(week.startDate)} – {dateLabel(week.endDate)}</span></span><span className="flex items-center gap-2">{week.records.length > 1 && <span className="text-xs text-muted-foreground">{week.records.length} lần kiểm tra</span>}<Badge variant="outline" className={week.records[0] ? resultStyle(week.records[0].result) : ""}>{week.records[0]?.result || (week.state === "current" ? "Tuần này · Chưa kiểm tra" : "Chưa kiểm tra")}</Badge></span></span></summary>
           <div className="mt-4 space-y-4">{week.records.length ? week.records.map((record) => <div key={`${record.check ? "check" : "legacy"}-${record.id}`} className="space-y-3 rounded-xl bg-slate-50 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{dateLabel(record.checkedAt)} · {record.check ? `${record.check.programLabel} · ${record.check.unitLabel}` : "Đánh giá đã lưu trước đây"}</p><p className="mt-1 text-xs text-muted-foreground">{record.check?.className || record.legacy?.className || "Chưa xếp lớp"} · Người kiểm tra: {record.check?.teacherName || record.legacy?.evaluatorName || "—"}</p></div><Badge variant="outline" className={resultStyle(record.result)}>{record.result}</Badge></div>
-            {record.check && <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{criteriaFor(record.check).map((item) => <div key={item.label} className="flex justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>}
+            {record.check && <HistoryCriteria criteria={criteriaFor(record.check)} />}
             <p className="whitespace-pre-wrap break-words text-sm">{record.check ? [feedback(record.check.feedbackJson), record.check.notes, record.check.actionPlan].filter(Boolean).join("\n") || "Chưa có nhận xét." : [record.legacy?.summary, record.legacy?.actionPlan].filter(Boolean).join("\n") || "Chưa có nhận xét."}</p>
             {record.check && <Button size="sm" variant="outline" onClick={() => onCheck(current.studentId, record.checkedAt, record.check)}><Pencil /> Cập nhật kết quả</Button>}
           </div>) : <p className="text-sm text-muted-foreground">{week.state === "current" ? "Tuần này chưa có kết quả được lưu." : "Tuần này chưa có kết quả."}</p>}
