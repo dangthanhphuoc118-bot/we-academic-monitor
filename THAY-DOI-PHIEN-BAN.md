@@ -1,3 +1,18 @@
+# Thay đổi phiên bản ngày 24/09/2026
+
+- Đổi toàn bộ Vocabulary sang danh sách bullet point gọn, áp dụng cả nội dung thường và Vocabulary chia 5 nhóm từ loại.
+- Phiếu Cambridge có ô chọn **Chủ đề Freestyle**. Hệ thống chỉ lấy ngẫu nhiên đúng 5 câu trong cùng chủ đề đã chọn, không còn trộn câu từ nhiều chủ đề.
+- Chỉ các chủ đề có tối thiểu 5 câu mới được dùng cho một lượt kiểm tra; người quản lý vẫn có thể bổ sung trực tiếp trong Khung chương trình.
+- Pronunciation trở thành một đánh giá chung cho cả Pattern và Free.
+- Khôi phục hai ô nhập điểm % riêng cho Pattern và Free. Hai điểm này tiếp tục quyết định Redflag/Average/Good theo quy tắc cũ.
+- One/Many và Am/Is/Are vẫn được ghi nhận riêng ở hai cột Pattern và Free nhưng không tự thay đổi điểm phần trăm.
+- API kiểm tra năm câu phải thuộc đúng một chủ đề và vẫn đọc được kết quả cũ, gồm cả dữ liệu đã lưu theo cấu trúc trước ngày 24/09.
+- Báo cáo và lịch sử 48 tuần hiển thị Pronunciation dùng chung, điểm % và các tiêu chí chi tiết đúng cấu trúc mới.
+- Không có migration mới và không xóa dữ liệu D1.
+- 19/19 kiểm thử API, dữ liệu và giao diện đạt.
+
+---
+
 # Thay đổi phiên bản ngày 23/09/2026
 
 - Thiết kế lại giao diện theo phong cách tối giản, hiện đại với nền trung tính, màu xanh giáo dục và các khối nội dung nhẹ hơn.
