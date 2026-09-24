@@ -415,8 +415,9 @@ function evaluationCriteria(check: LearningCheck) {
   ];
   const matrix = normalizeCambridgeEvaluation(evaluation);
   return [
-    { label: "Pattern · Pronunciation", criterion: "Pronunciation", category: "Pattern" as const, value: choice(matrix.pattern.pronunciation) },
-    { label: "Free · Pronunciation", criterion: "Pronunciation", category: "Free" as const, value: choice(matrix.free.pronunciation) },
+    { label: "Pronunciation", value: choice(matrix.pronunciation) },
+    { label: "Pattern · Điểm %", criterion: "Điểm %", category: "Pattern" as const, value: percent(evaluation.patternPercent) },
+    { label: "Free · Điểm %", criterion: "Điểm %", category: "Free" as const, value: percent(evaluation.freestylePercent) },
     { label: "Pattern · One / Many", criterion: "One / Many", category: "Pattern" as const, value: choice(matrix.pattern.oneOrMany) },
     { label: "Free · One / Many", criterion: "One / Many", category: "Free" as const, value: choice(matrix.free.oneOrMany) },
     { label: "Pattern · Am / Is / Are", criterion: "Am / Is / Are", category: "Pattern" as const, value: choice(matrix.pattern.amIsAre) },
@@ -429,8 +430,9 @@ function EvaluationCriteriaGrid({ criteria }: { criteria: EvaluationCriterion[] 
   if (!matrix) {
     return <div className="mt-2 grid gap-2 sm:grid-cols-2">{criteria.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label}</span><strong>{criterion.value}</strong></div>)}</div>;
   }
-  const rows = ["Pronunciation", "One / Many", "Am / Is / Are"];
-  return <div className="mt-2 overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div>;
+  const shared = criteria.filter((item) => !item.category);
+  const rows = ["Điểm %", "One / Many", "Am / Is / Are"];
+  return <div className="mt-2 space-y-2">{shared.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label} · dùng chung</span><strong>{criterion.value}</strong></div>)}<div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div></div>;
 }
 
 function studentProgressRecords(data: AcademicData): StudentProgressRecord[] {

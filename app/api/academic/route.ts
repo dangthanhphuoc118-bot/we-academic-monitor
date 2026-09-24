@@ -21,7 +21,6 @@ import {
 import { curriculumDefaults, curriculumKey, programs } from "@/lib/curriculum";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  cambridgeColumnPercent,
   isCompleteCambridgeEvaluation,
   normalizeCambridgeEvaluation,
 } from "@/lib/cambridge-evaluation";
@@ -30,6 +29,7 @@ import { isInStudentHistoryWindow, pruneExpiredStudentHistory } from "@/lib/hist
 import {
   defaultFreestyleBanks,
   flattenFreestyleCategories,
+  freestyleCategoryQuestions,
   normalizeFreestyleCategories,
   type FreestyleQuestionCategory,
   type SpeakingProgramCode,
@@ -627,6 +627,7 @@ export async function POST(request: Request) {
           return fail("Vui lòng đánh giá đủ ma trận Pattern và Free.");
         }
         const freestyleQuestions = questionList(evaluation.freestyleQuestions);
+        const freestyleCategory = text(evaluation.freestyleCategory);
         if (freestyleQuestions.length !== 5) {
           return fail("Mỗi lần kiểm tra cần đúng 5 câu Freestyle từ ngân hàng của level.");
         }
@@ -643,22 +644,24 @@ export async function POST(request: Request) {
           const categories = storedBank
             ? storedFreestyleCategories(storedBank.categoriesJson, defaultFreestyleBanks[speakingProgramCode])
             : defaultFreestyleBanks[speakingProgramCode];
-          const bankQuestions = flattenFreestyleCategories(categories);
-          if (bankQuestions.length < 5) {
-            return fail(`Ngân hàng Freestyle của level ${program.label} cần ít nhất 5 câu trước khi kiểm tra.`);
+          const selectedCategory = categories.find((category) => category.category === freestyleCategory);
+          if (!selectedCategory || freestyleCategoryQuestions(selectedCategory).length < 5) {
+            return fail(`Hãy chọn một chủ đề Freestyle có ít nhất 5 câu cho level ${program.label}.`);
           }
-          const availableQuestions = new Set(bankQuestions);
+          const availableQuestions = new Set(freestyleCategoryQuestions(selectedCategory));
           if (freestyleQuestions.some((question) => !availableQuestions.has(question))) {
-            return fail(`Có câu Freestyle không còn thuộc ngân hàng của level ${program.label}. Vui lòng chọn lại 5 câu.`);
+            return fail(`Năm câu Freestyle phải thuộc cùng chủ đề “${freestyleCategory}”. Vui lòng chọn lại.`);
           }
         }
+        evaluation.pronunciation = matrix.pronunciation;
         evaluation.pattern = matrix.pattern;
         evaluation.free = matrix.free;
+        if (freestyleCategory) evaluation.freestyleCategory = freestyleCategory;
         evaluation.freestyleQuestions = freestyleQuestions;
-        const patternPercent = cambridgeColumnPercent(matrix.pattern);
-        const freestylePercent = cambridgeColumnPercent(matrix.free);
-        evaluation.patternPercent = Math.round(patternPercent * 100) / 100;
-        evaluation.freestylePercent = Math.round(freestylePercent * 100) / 100;
+        const patternPercent = clampPercent(evaluation.patternPercent);
+        const freestylePercent = clampPercent(evaluation.freestylePercent);
+        evaluation.patternPercent = patternPercent;
+        evaluation.freestylePercent = freestylePercent;
         componentPercentages = [patternPercent, freestylePercent];
         hasRedflagComponent = patternPercent < 60 || freestylePercent < 60;
       }

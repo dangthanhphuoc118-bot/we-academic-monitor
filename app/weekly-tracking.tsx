@@ -31,8 +31,9 @@ function HistoryCriteria({ criteria }: { criteria: EvaluationCriterion[] }) {
   if (!criteria.some((item) => item.category)) {
     return <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{criteria.map((item) => <div key={item.label} className="flex justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>;
   }
-  const rows = ["Pronunciation", "One / Many", "Am / Is / Are"];
-  return <div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div>;
+  const shared = criteria.filter((item) => !item.category);
+  const rows = ["Điểm %", "One / Many", "Am / Is / Are"];
+  return <div className="space-y-2">{shared.map((item) => <div key={item.label} className="flex justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span>{item.label} · dùng chung</span><strong>{item.value}</strong></div>)}<div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div></div>;
 }
 
 export function WeeklyTracking({ students, classes, revision, initialStudentId = "", onCheck, criteriaFor }: {
