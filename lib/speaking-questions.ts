@@ -179,3 +179,32 @@ export function sampleFreestyleQuestionsByType(
   const remaining = [...yesNo, ...wh].filter((question) => !selected.includes(question));
   return [...selected, ...sampleSpeakingQuestions(remaining, count - selected.length)].slice(0, count);
 }
+
+export function freestyleCategoryQuestions(category: FreestyleQuestionCategory) {
+  return Array.from(new Set([...category.yesNoQuestions, ...category.whQuestions]));
+}
+
+export function eligibleFreestyleCategories(
+  categories: readonly FreestyleQuestionCategory[],
+  count = 5
+) {
+  return categories.filter((category) => freestyleCategoryQuestions(category).length >= count);
+}
+
+export function sampleFreestyleQuestionsFromCategory(
+  category: FreestyleQuestionCategory,
+  count = 5
+) {
+  const selected = sampleFreestyleQuestionsByType([category], count);
+  return selected.slice(0, count);
+}
+
+export function findFreestyleCategoryForQuestions(
+  questions: readonly string[],
+  categories: readonly FreestyleQuestionCategory[]
+) {
+  return categories.find((category) => {
+    const available = new Set(freestyleCategoryQuestions(category));
+    return questions.length > 0 && questions.every((question) => available.has(question));
+  });
+}

@@ -189,9 +189,9 @@ test("Academic payload includes observations and does not overwrite custom curri
   assert.deepEqual(data.freestyleBanks.find((bank) => bank.programCode === "FLYERS").categories, []);
 
   const blockedQuestions = ["Mover A?", "Mover B?", "Mover C?", "Mover D?", "Mover E?"];
-  const blocked = await academic.POST(req("/api/academic", "academic_leader", { action: "createLearningCheck", studentId: 2, programCode: "MOVERS", unitNumber: 1, checkedAt: "2026-09-18", notes: "", feedback: [], evaluation: { pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" }, free: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" }, freestyleQuestions: blockedQuestions } }));
+  const blocked = await academic.POST(req("/api/academic", "academic_leader", { action: "createLearningCheck", studentId: 2, programCode: "MOVERS", unitNumber: 1, checkedAt: "2026-09-18", notes: "", feedback: [], evaluation: { patternPercent: 90, freestylePercent: 90, pronunciation: "clear", pattern: { oneOrMany: "correct", amIsAre: "correct" }, free: { oneOrMany: "correct", amIsAre: "correct" }, freestyleCategory: "General", freestyleQuestions: blockedQuestions } }));
   assert.equal(blocked.status, 400);
-  assert.match((await blocked.json()).error, /cần ít nhất 5 câu/);
+  assert.match((await blocked.json()).error, /ít nhất 5 câu/);
 
   const customQuestions = ["Flyers question A?", "Flyers question B?", "Flyers question C?", "Flyers question D?", "Flyers question E?"];
   const bankSaved = await academic.POST(req("/api/academic", "academic_manager", { action: "updateFreestyleBank", programCode: "FLYERS", categories: [{ category: "General", yesNoQuestions: customQuestions.slice(0, 2), whQuestions: customQuestions.slice(2) }] }));
@@ -234,7 +234,7 @@ test("A class can assign multiple teachers and keeps the previous teacher after 
 
 test("Saving and editing a student check updates its rolling history without duplicate records", async () => {
   const questions = ["Flyers question A?", "Flyers question B?", "Flyers question C?", "Flyers question D?", "Flyers question E?"];
-  const body = { action: "createLearningCheck", studentId: 1, programCode: "FLYERS", unitNumber: 2, checkedAt: "2026-09-18", notes: "Weekly feedback", feedback: [], evaluation: { pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" }, free: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "incorrect" }, freestyleQuestions: questions } };
+  const body = { action: "createLearningCheck", studentId: 1, programCode: "FLYERS", unitNumber: 2, checkedAt: "2026-09-18", notes: "Weekly feedback", feedback: [], evaluation: { patternPercent: 90, freestylePercent: 80, pronunciation: "clear", pattern: { oneOrMany: "correct", amIsAre: "correct" }, free: { oneOrMany: "correct", amIsAre: "incorrect" }, freestyleCategory: "General", freestyleQuestions: questions } };
   const created = await academic.POST(req("/api/academic", "academic_leader", body));
   assert.equal(created.status, 201, await created.clone().text());
   const { item } = await created.json();
@@ -242,8 +242,10 @@ test("Saving and editing a student check updates its rolling history without dup
   const savedEvaluation = JSON.parse(sqlite.prepare("SELECT evaluation_json AS evaluationJson FROM learning_checks WHERE id=?").get(item.id).evaluationJson);
   assert.deepEqual(savedEvaluation.pattern, body.evaluation.pattern);
   assert.deepEqual(savedEvaluation.free, body.evaluation.free);
-  assert.equal(savedEvaluation.patternPercent, 100);
-  assert.equal(Math.round(savedEvaluation.freestylePercent), 67);
+  assert.equal(savedEvaluation.pronunciation, "clear");
+  assert.equal(savedEvaluation.freestyleCategory, "General");
+  assert.equal(savedEvaluation.patternPercent, 90);
+  assert.equal(savedEvaluation.freestylePercent, 80);
   const countBefore = sqlite.prepare("SELECT count(*) AS n FROM learning_checks").get().n;
   const updated = await academic.POST(req("/api/academic", "academic_manager", { ...body, action: "updateLearningCheck", id: item.id, checkedAt: "2026-09-13", notes: "Updated feedback" }));
   assert.equal(updated.status, 200, await updated.clone().text());
