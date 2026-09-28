@@ -169,7 +169,7 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
   const speakingProgramCode = program?.group === "cambridge" || program?.group === "baby" ? program.code as SpeakingProgramCode : null;
   const freestyleBank = speakingProgramCode ? freestyleBanks.find((bank) => bank.programCode === speakingProgramCode) : undefined;
   const levelFreestyleCategories = speakingProgramCode
-    ? freestyleBank?.categories ?? defaultFreestyleBanks[speakingProgramCode]
+    ? freestyleBank?.categories ?? defaultFreestyleBanks[speakingProgramCode] ?? []
     : [];
   const freestyleTopicOptions = eligibleFreestyleCategories(levelFreestyleCategories);
   const savedFreestyleQuestions = Array.isArray(initialEvaluation.freestyleQuestions) ? initialEvaluation.freestyleQuestions.filter((item): item is string => typeof item === "string") : [];
@@ -287,7 +287,7 @@ export function CurriculumManager({ curriculum, freestyleBanks, onReload }: { cu
   const rows = curriculum.filter((unit) => unit.programCode === programCode);
   const speakingProgramCode = selectedProgram.group === "cambridge" || selectedProgram.group === "baby" ? selectedProgram.code as SpeakingProgramCode : null;
   const selectedFreestyleBank = speakingProgramCode
-    ? freestyleBanks.find((bank) => bank.programCode === speakingProgramCode) ?? { programCode: speakingProgramCode, programLabel: selectedProgram.label, categories: defaultFreestyleBanks[speakingProgramCode] }
+    ? freestyleBanks.find((bank) => bank.programCode === speakingProgramCode) ?? { programCode: speakingProgramCode, programLabel: selectedProgram.label, categories: defaultFreestyleBanks[speakingProgramCode] ?? [] }
     : null;
 
   const reset = async () => {
@@ -306,8 +306,9 @@ export function CurriculumManager({ curriculum, freestyleBanks, onReload }: { cu
 }
 
 function LevelFreestyleBank({ bank, onEdit }: { bank: FreestyleBank; onEdit: () => void }) {
-  const total = flattenFreestyleCategories(bank.categories).length;
-  return <Card className="overflow-hidden border-emerald-200 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader className="border-b bg-emerald-50/80"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-lg">Freestyle · ngân hàng chung level {bank.programLabel}</CardTitle><p className="mt-1 text-sm text-muted-foreground">Áp dụng cho tất cả Unit của level này · {bank.categories.length} nhóm · {total} câu</p></div><Button type="button" variant="outline" onClick={onEdit}><Pencil /> Chỉnh sửa ngân hàng</Button></div></CardHeader><CardContent className="pt-5">{bank.categories.length ? <div className="grid gap-4 lg:grid-cols-2">{bank.categories.map((category, index) => <div key={`${category.category}-${index}`} className="rounded-xl border bg-slate-50/70 p-4"><p className="font-bold text-[#0b5c75]">{category.category}</p><div className="mt-3 grid gap-4 sm:grid-cols-2"><QuestionColumn title="YES / NO" questions={category.yesNoQuestions} /><QuestionColumn title="WH QUESTIONS" questions={category.whQuestions} /></div></div>)}</div> : <EmptyBox title={`Chưa có câu Freestyle cho ${bank.programLabel}`} description="Bạn có thể tạo nhóm chủ đề và nhập câu hỏi trực tiếp. Cần ít nhất 5 câu để bắt đầu một lượt kiểm tra mới." action={<Button type="button" onClick={onEdit}><Plus /> Thêm nội dung</Button>} />}</CardContent></Card>;
+  const categories = Array.isArray(bank.categories) ? bank.categories : [];
+  const total = flattenFreestyleCategories(categories).length;
+  return <Card className="overflow-hidden border-emerald-200 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader className="border-b bg-emerald-50/80"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-lg">Freestyle · ngân hàng chung level {bank.programLabel}</CardTitle><p className="mt-1 text-sm text-muted-foreground">Áp dụng cho tất cả Unit của level này · {categories.length} nhóm · {total} câu</p></div><Button type="button" variant="outline" onClick={onEdit}><Pencil /> Chỉnh sửa ngân hàng</Button></div></CardHeader><CardContent className="pt-5">{categories.length ? <div className="grid gap-4 lg:grid-cols-2">{categories.map((category, index) => <div key={`${category.category}-${index}`} className="rounded-xl border bg-slate-50/70 p-4"><p className="font-bold text-[#0b5c75]">{category.category}</p><div className="mt-3 grid gap-4 sm:grid-cols-2"><QuestionColumn title="YES / NO" questions={category.yesNoQuestions} /><QuestionColumn title="WH QUESTIONS" questions={category.whQuestions} /></div></div>)}</div> : <EmptyBox title={`Chưa có câu Freestyle cho ${bank.programLabel}`} description="Nếu vừa cập nhật website, hãy kiểm tra file lib/speaking-questions.ts đã được tải lên GitHub cùng phiên bản. Bạn cũng có thể thêm câu hỏi trực tiếp tại đây." action={<Button type="button" onClick={onEdit}><Plus /> Thêm nội dung</Button>} />}</CardContent></Card>;
 }
 
 function QuestionColumn({ title, questions }: { title: string; questions: string[] }) {
@@ -320,7 +321,7 @@ function questionsFromText(value: string) {
 
 function FreestyleBankEditor({ bank, onClose, onSaved }: { bank: FreestyleBank; onClose: () => void; onSaved: () => Promise<void> | void }) {
   type EditableCategory = { id: string; category: string; yesNoText: string; whText: string };
-  const [categories, setCategories] = useState<EditableCategory[]>(bank.categories.map((category, index) => ({ id: `saved-${index}`, category: category.category, yesNoText: category.yesNoQuestions.join("\n"), whText: category.whQuestions.join("\n") })));
+  const [categories, setCategories] = useState<EditableCategory[]>((bank.categories ?? []).map((category, index) => ({ id: `saved-${index}`, category: category.category, yesNoText: category.yesNoQuestions.join("\n"), whText: category.whQuestions.join("\n") })));
   const [saving, setSaving] = useState(false);
   const normalizedCategories: FreestyleQuestionCategory[] = categories.map((category) => ({ category: category.category.trim(), yesNoQuestions: questionsFromText(category.yesNoText), whQuestions: questionsFromText(category.whText) }));
   const total = flattenFreestyleCategories(normalizedCategories).length;
