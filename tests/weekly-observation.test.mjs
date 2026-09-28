@@ -330,6 +330,18 @@ test("Cambridge saves every question in the selected topic", async () => {
   assert.equal(partial.status, 400);
 });
 
+test("Review from the previous level can be checked before Unit 1", async () => {
+  const review = { unitNumbers: [100], vocabularyCorrect: 26, communicationPercent: 80, pronunciation: "clear" };
+  const first = { unitNumbers: [1], vocabularyCorrect: 8, communicationPercent: 90, pronunciation: "clear" };
+  const response = await academic.POST(req("/api/academic", "academic_leader", { action: "createLearningCheck", studentId: 3,
+    programCode: "SUPER_KIDS_1", unitNumber: 100, unitNumbers: [100, 1], checkedAt: "2026-09-18",
+    evaluation: { unitEvaluations: [review, first] } }));
+  assert.equal(response.status, 201, await response.clone().text());
+  const item = (await response.json()).item;
+  assert.equal(item.unitLabel, "All reviews · Baby Stars, Unit 1");
+  assert.deepEqual(JSON.parse(item.evaluationJson).unitEvaluations.map((entry) => entry.unitNumbers), [[100], [1]]);
+});
+
 test("Observation snapshot remains readable and editable when teacher/class are removed", async () => {
   sqlite.exec("DELETE FROM teachers WHERE id=1; DELETE FROM classes WHERE id=1;");
   const response = await observations.GET(req("/api/observations"));

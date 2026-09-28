@@ -17,7 +17,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp; lớp không còn gắn cứng với một trình độ.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
 - Khung Movers và Flyers hiển thị riêng 5 nhóm ADJ, NOUN, VERB, ADV và PREPOSITION.
-- Super Kids 1–8 có thêm All reviews sau Unit cuối để kiểm tra tổng hợp.
+- Super Kids 1–8 có All reviews của level trước ngay trước Unit 1 và All reviews tổng hợp của level hiện tại sau Unit cuối. Từ vựng ôn tập chia rõ theo từng Unit.
 - Baby Stars, Starters, Movers và Flyers đều có ngân hàng Freestyle chung cho toàn bộ Unit; Cambridge hiển thị toàn bộ câu trong chủ đề đã chọn, Baby Stars hiển thị bộ câu hỏi tham khảo.
 - Starters có sẵn 46 câu theo 7 chủ đề từ tài liệu mới; Movers và Flyers để trống để nhập trực tiếp trong Khung chương trình.
 - Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
@@ -43,7 +43,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 ## Hướng dẫn nhanh
 
-**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật theo PDF](HUONG-DAN-CAP-NHAT-PDF-28-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
+**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật thứ tự Unit](HUONG-DAN-CAP-NHAT-THU-TU-UNIT-28-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
 
 Toàn bộ hướng dẫn từng bước nằm trong file [HUONG-DAN-SETUP.md](HUONG-DAN-SETUP.md).
 

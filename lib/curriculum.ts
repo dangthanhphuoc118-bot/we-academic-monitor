@@ -265,24 +265,50 @@ function superWithAllReviews(source: CurriculumUnit[]): CurriculumUnit[] {
     unitLabel: "All reviews",
     topic: "All reviews",
     content: `Ôn tập tổng hợp ${source.map((unit) => unit.unitLabel).join(", ")}`,
-    vocabulary: source.map((unit) => `${unit.unitLabel}: ${unit.vocabulary}`).join("\n"),
-    grammar: source.map((unit) => `${unit.unitLabel}: ${unit.grammar}`).join("\n"),
+    vocabulary: source.map((unit) => `## ${unit.unitLabel} · ${unit.topic}\n${unit.vocabulary}`).join("\n\n"),
+    grammar: source.map((unit) => `${unit.unitLabel} · ${unit.topic}: ${unit.grammar}`).join("\n\n"),
     vocabularyMax: source.reduce((sum, unit) => sum + unit.vocabularyMax, 0),
     dayStart: last.dayEnd + 1,
     dayEnd: last.dayEnd + 1,
   }];
 }
 
+// 100 is a stable positive ID for the chapter placed before Unit 1. Existing
+// Unit IDs and saved checks remain intact; display order follows this array.
+export const PREVIOUS_LEVEL_REVIEW_UNIT_NUMBER = 100;
+
+function previousLevelReview(source: CurriculumUnit[], current: CurriculumUnit[]): CurriculumUnit {
+  const review = source[source.length - 1];
+  const first = current[0];
+  return {
+    ...review,
+    programCode: first.programCode,
+    programLabel: first.programLabel,
+    series: first.series,
+    group: first.group,
+    unitNumber: PREVIOUS_LEVEL_REVIEW_UNIT_NUMBER,
+    unitLabel: `All reviews · ${review.programLabel}`,
+    topic: `Ôn tập ${review.programLabel}`,
+    content: `Nội dung All reviews của ${review.programLabel} trước ${first.unitLabel} của ${first.programLabel}`,
+    dayStart: 0,
+    dayEnd: 0,
+  };
+}
+
+const babyStarsReview: CurriculumUnit = {
+  ...babyStars[babyStars.length - 1],
+  unitLabel: "All reviews",
+  topic: "All reviews",
+  vocabulary: "## Alphabet · A–Z\nA - B - C - D - E - F - G - H - I - J - K - L - M - N - O - P - Q - R - S - T - U - V - W - X - Y - Z",
+  grammar: "Spelling, Writing và câu hỏi Freestyle Baby Stars.",
+  vocabularyMax: 26,
+};
+
+const superKidsReviews = [superKids1, superKids2, superKids3, superKids4, superKids5, superKids6, superKids7, superKids8].map(superWithAllReviews);
+
 export const curriculumDefaults: CurriculumUnit[] = [
   ...babyStars,
-  ...superWithAllReviews(superKids1),
-  ...superWithAllReviews(superKids2),
-  ...superWithAllReviews(superKids3),
-  ...superWithAllReviews(superKids4),
-  ...superWithAllReviews(superKids5),
-  ...superWithAllReviews(superKids6),
-  ...superWithAllReviews(superKids7),
-  ...superWithAllReviews(superKids8),
+  ...superKidsReviews.flatMap((units, index) => [previousLevelReview(index ? superKidsReviews[index - 1] : [babyStarsReview], units), ...units]),
   ...starters,
   ...movers,
   ...flyers,

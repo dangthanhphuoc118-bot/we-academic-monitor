@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
-import { curriculumDefaults } from "../lib/curriculum.ts";
+import { curriculumDefaults, PREVIOUS_LEVEL_REVIEW_UNIT_NUMBER } from "../lib/curriculum.ts";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { CurriculumManager, CurriculumStudentCheck } from "../app/curriculum-check.tsx";
 import { normalizeCambridgeEvaluation } from "../lib/cambridge-evaluation.ts";
 import { defaultFreestyleBanks, eligibleFreestyleCategories, flattenFreestyleCategories, freestyleCategoryQuestions, sampleFreestyleQuestionsFromCategory, sampleSpeakingQuestions, splitFreestyleQuestions } from "../lib/speaking-questions.ts";
-import { parseVocabularyGroups, vocabularyGroupLabels } from "../lib/vocabulary.ts";
+import { parseReviewVocabularySections, parseVocabularyGroups, vocabularyGroupLabels } from "../lib/vocabulary.ts";
 
 const flyers = curriculumDefaults.filter((unit) => unit.programCode === "FLYERS");
 
@@ -178,9 +178,34 @@ test("Class editor exposes multiple teacher assignments", () => {
 test("Each Super Kids level has a cumulative All reviews chapter after its units", () => {
   for (let level = 1; level <= 8; level++) {
     const units = curriculumDefaults.filter((unit) => unit.programCode === `SUPER_KIDS_${level}`);
+    assert.equal(units[0].unitNumber, PREVIOUS_LEVEL_REVIEW_UNIT_NUMBER);
+    assert.equal(units[0].unitLabel, `All reviews · ${level === 1 ? "Baby Stars" : `Super Kids ${level - 1}`}`);
+    assert.equal(units[1].unitNumber, 1);
     const review = units.at(-1);
     assert.equal(review.unitLabel, "All reviews");
     assert.equal(review.unitNumber, units.at(-2).unitNumber + 1);
-    assert.equal(review.vocabularyMax, units.slice(0, -1).reduce((sum, unit) => sum + unit.vocabularyMax, 0));
+    assert.equal(review.vocabularyMax, units.slice(1, -1).reduce((sum, unit) => sum + unit.vocabularyMax, 0));
+    assert.equal(parseReviewVocabularySections(review.vocabulary).length, units.length - 2);
+    if (level > 1) assert.equal(units[0].vocabulary, curriculumDefaults.find((unit) => unit.programCode === `SUPER_KIDS_${level - 1}` && unit.unitLabel === "All reviews").vocabulary);
   }
+});
+
+test("Existing All reviews vocabulary is also separated into Unit sections", () => {
+  assert.deepEqual(parseReviewVocabularySections("Unit 1: Fans - T-shirt\nUnit 2: Grandma - uncle"), [
+    { label: "Unit 1", vocabulary: "Fans - T-shirt" },
+    { label: "Unit 2", vocabulary: "Grandma - uncle" },
+  ]);
+});
+
+test("Multi-unit check alternates each reference with its Evaluation Criteria", () => {
+  const html = renderToString(React.createElement(CurriculumStudentCheck, {
+    classes: [{ id: 1, name: "Super A", level: "Super Kids 4", schedule: "", teacherName: null }],
+    students: [{ id: 1, name: "Test", classId: 1, className: "Super A", level: "Super Kids 4" }],
+    curriculum: curriculumDefaults, freestyleBanks: [], levelOptions: [], feedbackOptions: [],
+    selectedClassId: "1", setSelectedClassId: () => {}, selectedStudentId: "1", setSelectedStudentId: () => {},
+    initialUnitNumbers: [4, 5], onSaved: () => {}, openFeedbackOptions: () => {},
+  }));
+  const positions = ["Unit 4: Months", "Evaluation Criteria · <!-- -->Unit 4", "Unit 5: Careers", "Evaluation Criteria · <!-- -->Unit 5"].map((value) => html.indexOf(value));
+  assert.ok(positions.every((value) => value >= 0), positions);
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions);
 });
