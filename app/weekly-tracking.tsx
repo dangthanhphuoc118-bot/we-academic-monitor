@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, ClipboardCheck, LoaderCircle, Pencil, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { build48Weeks, vietnamToday } from "@/lib/weekly-history";
+import { build12Weeks, vietnamToday } from "@/lib/weekly-history";
 import type { LearningCheck } from "@/lib/curriculum";
 
 type Student = { id: number; name: string; classId: number | null; level: string };
@@ -19,7 +19,7 @@ type History = {
   legacy: Legacy[];
 };
 type WeeklyRecord = { id: number; checkedAt: string; createdAt?: string; result: string; check?: LearningCheck; legacy?: Legacy };
-type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string };
+type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string; unitLabel?: string };
 const dateLabel = (value: string) => value.split("-").reverse().join("/");
 const selectStyle = "h-10 w-full rounded-lg border bg-white px-3 text-sm";
 const resultStyle = (result: string) => result === "Good" || result === "Tốt" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : result === "Average" || result === "Đạt" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-rose-200 bg-rose-50 text-rose-800";
@@ -28,6 +28,8 @@ const weekAge = (weekStart: string, currentWeekStart: string) =>
   Math.round((Date.parse(`${currentWeekStart}T00:00:00Z`) - Date.parse(`${weekStart}T00:00:00Z`)) / (7 * 24 * 60 * 60 * 1000));
 
 function HistoryCriteria({ criteria }: { criteria: EvaluationCriterion[] }) {
+  const labels = Array.from(new Set(criteria.map((item) => item.unitLabel).filter((label): label is string => Boolean(label))));
+  if (labels.length) return <div className="space-y-3">{labels.map((label) => <div key={label} className="rounded-lg border bg-slate-50 p-3"><p className="mb-2 text-sm font-bold text-[#143b63]">{label}</p><HistoryCriteria criteria={criteria.filter((item) => item.unitLabel === label).map((item) => ({ ...item, unitLabel: undefined }))} /></div>)}</div>;
   if (!criteria.some((item) => item.category)) {
     return <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{criteria.map((item) => <div key={item.label} className="flex justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>;
   }
@@ -75,19 +77,19 @@ export function WeeklyTracking({ students, classes, revision, initialStudentId =
     ...current.learningChecks.map((check) => ({ id: check.id, checkedAt: check.checkedAt, createdAt: check.createdAt, result: check.result, check })),
     ...current.legacy.map((legacy) => ({ id: legacy.id, checkedAt: legacy.checkedAt, createdAt: legacy.createdAt, result: legacy.result, legacy })),
   ] : [];
-  const weeks = current ? build48Weeks(current.startDate, records, today) : [];
+  const weeks = current ? build12Weeks(current.startDate, records, today) : [];
   const chooseStudent = (value: string) => setStudentId(value);
 
   return <div className="space-y-6">
-    <div><p className="text-xs font-bold uppercase tracking-widest text-[#2f6f9f]">Student Journey</p><h1 className="mt-1 text-3xl font-bold">Theo dõi 48 tuần</h1><p className="mt-2 text-sm text-muted-foreground">Luôn hiển thị tuần hiện tại và 47 tuần trước đó, tính từ thứ Hai đến Chủ nhật. Khi sang tuần mới, tuần thứ 49 trong quá khứ được tự động xóa.</p></div>
+    <div><p className="text-xs font-bold uppercase tracking-widest text-[#2f6f9f]">Student Journey</p><h1 className="mt-1 text-3xl font-bold">Theo dõi 12 tuần</h1><p className="mt-2 text-sm text-muted-foreground">Hiển thị tuần hiện tại và 11 tuần trước đó, tính từ thứ Hai đến Chủ nhật.</p></div>
     <div className="grid gap-4 rounded-2xl bg-white p-5 sm:grid-cols-2">
       <label className="space-y-2 text-sm font-medium">Lớp học<select className={selectStyle} value={classId} onChange={(event) => { setClassId(event.target.value); chooseStudent(""); }}><option value="">Tất cả lớp</option><option value="unassigned">Chưa xếp lớp</option>{classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
       <label className="space-y-2 text-sm font-medium">Học viên<select className={selectStyle} value={studentId} onChange={(event) => chooseStudent(event.target.value)}><option value="">Chọn học viên</option>{students.filter((student) => !classId || (classId === "unassigned" ? student.classId === null : String(student.classId) === classId)).map((student) => <option value={student.id} key={student.id}>{student.name} · {student.level}</option>)}</select></label>
     </div>
-    {!selectedStudent ? <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground"><CalendarDays className="mx-auto mb-3" />Chọn học viên để xem 48 tuần gần nhất.</div> : loading ? <p className="flex items-center gap-2 py-8"><LoaderCircle className="animate-spin" />Đang tải lịch sử của {selectedStudent.name}...</p> : error ? <div className="rounded-xl border border-rose-200 bg-white p-5"><p role="alert">{error}</p><Button className="mt-3" variant="outline" onClick={() => setRefresh((value) => value + 1)}><RefreshCw /> Thử lại</Button></div> : current && <>
+    {!selectedStudent ? <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground"><CalendarDays className="mx-auto mb-3" />Chọn học viên để xem 12 tuần gần nhất.</div> : loading ? <p className="flex items-center gap-2 py-8"><LoaderCircle className="animate-spin" />Đang tải lịch sử của {selectedStudent.name}...</p> : error ? <div className="rounded-xl border border-rose-200 bg-white p-5"><p role="alert">{error}</p><Button className="mt-3" variant="outline" onClick={() => setRefresh((value) => value + 1)}><RefreshCw /> Thử lại</Button></div> : current && <>
       <div className="space-y-3 rounded-2xl bg-white p-5">
         <div><h2 className="text-xl font-bold">{selectedStudent.name}</h2><p className="mt-1 text-sm text-muted-foreground">{dateLabel(current.startDate)} – {dateLabel(current.endDate)} · {selectedStudent.level}</p></div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><strong>Lưu trữ cuốn chiếu:</strong> hệ thống giữ đúng 48 tuần gần nhất. Kết quả trước ngày {dateLabel(current.deletedBefore)} đã được xóa; hãy sao lưu D1 trước khi cần giữ dữ liệu lâu hơn.</div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><strong>Lưu trữ:</strong> màn hình hiển thị 12 tuần gần nhất; dữ liệu cũ hơn vẫn theo chính sách lưu 48 tuần hiện có. Kết quả trước ngày {dateLabel(current.deletedBefore)} đã được dọn theo chính sách này.</div>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">{[
         { label: "Tuần đã kiểm tra", count: weeks.filter((week) => week.records.length).length, style: "bg-emerald-50 text-emerald-800" },
@@ -109,7 +111,7 @@ export function WeeklyTracking({ students, classes, revision, initialStudentId =
           </div>
         </details>;
       })}</div>
-      <p className="text-xs leading-5 text-muted-foreground">Nếu một tuần có nhiều lần kiểm tra, nhãn tuần dùng kết quả có ngày mới nhất; mở tuần để xem tất cả. Dữ liệu ngoài cửa sổ 48 tuần bị xóa vĩnh viễn khỏi D1 khi hệ thống được sử dụng sau khi sang tuần mới.</p>
+      <p className="text-xs leading-5 text-muted-foreground">Nếu một tuần có nhiều lần kiểm tra, nhãn tuần dùng kết quả có ngày mới nhất; mở tuần để xem tất cả. Màn này chỉ hiển thị 12 tuần gần nhất.</p>
     </>}
   </div>;
 }

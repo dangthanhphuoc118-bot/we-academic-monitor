@@ -2,7 +2,7 @@ import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { getDb } from "@/db";
 import { classes, learningChecks, studentAssessments, students } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { pruneExpiredStudentHistory, studentHistoryWindow } from "@/lib/history-retention";
+import { pruneExpiredStudentHistory, studentTrackingWindow } from "@/lib/history-retention";
 
 const fail = (error: string, status = 400) => Response.json({ error }, { status });
 const positiveId = (value: unknown) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null;
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   try {
     const db = getDb();
     const { deletedBefore } = await pruneExpiredStudentHistory(db);
-    const { startDate, endDate, endExclusive, currentWeekStart } = studentHistoryWindow();
+    const { startDate, endDate, endExclusive, currentWeekStart } = studentTrackingWindow();
     const student = await db.select().from(students).where(eq(students.id, studentId)).get();
     if (!student) return fail("Không tìm thấy học viên.", 404);
 
@@ -41,11 +41,11 @@ export async function GET(request: Request) {
       legacy: legacy.map(({ assessment, className }) => ({ ...assessment, className, studentName: student.name })),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return fail("Không thể tải lịch sử 48 tuần. Kiểm tra kết nối và migration mới nhất.", 500);
+    return fail("Không thể tải lịch sử 12 tuần. Kiểm tra kết nối và migration mới nhất.", 500);
   }
 }
 
 export async function POST(request: Request) {
   if (!await getCurrentUser(request)) return fail("Phiên đăng nhập đã hết hạn.", 401);
-  return fail("Mốc 48 tuần được hệ thống tính tự động và không thể thay đổi thủ công.", 405);
+  return fail("Mốc 12 tuần được hệ thống tính tự động và không thể thay đổi thủ công.", 405);
 }

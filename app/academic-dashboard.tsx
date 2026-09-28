@@ -47,7 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { CurriculumManager, CurriculumStudentCheck, type FeedbackOption, type LevelOption } from "./curriculum-check";
 import { normalizeCambridgeEvaluation } from "@/lib/cambridge-evaluation";
-import { programs, type CurriculumUnit, type LearningCheck, type StudentCheckQueueItem } from "@/lib/curriculum";
+import { curriculumDefaults, programs, type CurriculumUnit, type LearningCheck, type StudentCheckQueueItem } from "@/lib/curriculum";
 import type { FreestyleBank } from "@/lib/speaking-questions";
 import { AccountManager, LoginScreen, roleLabels, type CurrentUser } from "./auth-components";
 
@@ -67,7 +67,7 @@ type TeacherRow = { id: number; name: string; email: string; phone: string; spec
 type CriterionRow = { id: number; targetType: "student" | "teacher"; level: string; category: string; title: string; description: string; weight: number; active: number; sortOrder: number };
 type StudentAssessment = { id: number; studentId: number; studentName: string; classId: number | null; className: string | null; evaluatorName: string; overallScore: number; result: string; summary: string; actionPlan: string; checkedAt: string };
 type TeacherReview = { id: number; teacherId: number; teacherName: string; reviewerName: string; overallScore: number; result: string; summary: string; actionPlan: string; observedAt: string };
-export type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string };
+export type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string; unitLabel?: string };
 type StudentProgressRecord = { id: number; studentId: number; studentName: string; classId: number | null; className: string | null; overallScore: number; result: string; checkedAt: string; source: "legacy" | "curriculum"; programLabel?: string; unitLabel?: string; teacherName?: string; reason: string; criteria: EvaluationCriterion[] };
 type AcademicData = { classes: ClassRow[]; students: StudentRow[]; teachers: TeacherRow[]; criteria: CriterionRow[]; studentAssessments: StudentAssessment[]; teacherReviews: TeacherReview[]; teacherObservations: TeacherObservation[]; curriculum: CurriculumUnit[]; freestyleBanks: FreestyleBank[]; learningChecks: LearningCheck[]; levelOptions: LevelOption[]; feedbackOptions: FeedbackOption[]; checkQueue: StudentCheckQueueItem[] };
 
@@ -89,7 +89,7 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard; section
   { id: "feedback-options", label: "Mẫu nhận xét", icon: ListChecks, section: "manage" },
   { id: "criteria", label: "Tiêu chí bổ sung", icon: Settings2, section: "manage" },
   { id: "accounts", label: "Tài khoản", icon: UserCog, section: "manage" },
-  { id: "weekly-tracking", label: "Theo dõi 48 tuần", icon: CalendarDays, section: "report" },
+  { id: "weekly-tracking", label: "Theo dõi 12 tuần", icon: CalendarDays, section: "report" },
   { id: "reports", label: "Báo cáo", icon: BarChart3, section: "report" },
 ];
 
@@ -407,29 +407,37 @@ function evaluationCriteria(check: LearningCheck) {
   const program = programs.find((item) => item.code === check.programCode);
   const percent = (value: unknown) => `${Number(value) || 0}%`;
   const choice = (value: unknown) => String(value || "—").toUpperCase();
-  if (program?.group === "baby") return [
-    { label: "Spelling", value: percent(evaluation.spellingPercent) },
-    { label: "Writing", value: percent(evaluation.writingPercent) },
-  ];
-  if (program?.group === "super") return [
-    { label: "Vocabulary", value: `${Number(evaluation.vocabularyCorrect) || 0}/${Number(evaluation.vocabularyMax) || 0}` },
-    { label: "Communication", value: percent(evaluation.communicationPercent) },
-    { label: "Pronunciation", value: choice(evaluation.pronunciation) },
-  ];
-  const matrix = normalizeCambridgeEvaluation(evaluation);
-  return [
+  const rows = (value: Record<string, unknown>): EvaluationCriterion[] => program?.group === "baby" ? [
+    { label: "Spelling", value: percent(value.spellingPercent) },
+    { label: "Writing", value: percent(value.writingPercent) },
+  ] : program?.group === "super" ? [
+    { label: "Vocabulary", value: `${Number(value.vocabularyCorrect) || 0}/${Number(value.vocabularyMax) || 0}` },
+    { label: "Communication", value: percent(value.communicationPercent) },
+    { label: "Pronunciation", value: choice(value.pronunciation) },
+  ] : (() => { const matrix = normalizeCambridgeEvaluation(value); return [
     { label: "Pattern · Pronunciation", criterion: "Pronunciation", category: "Pattern" as const, value: choice(matrix.pattern.pronunciation) },
     { label: "Free · Pronunciation", criterion: "Pronunciation", category: "Free" as const, value: choice(matrix.free.pronunciation) },
-    { label: "Pattern · Điểm %", criterion: "Điểm %", category: "Pattern" as const, value: percent(evaluation.patternPercent) },
-    { label: "Free · Điểm %", criterion: "Điểm %", category: "Free" as const, value: percent(evaluation.freestylePercent) },
+    { label: "Pattern · Điểm %", criterion: "Điểm %", category: "Pattern" as const, value: percent(value.patternPercent) },
+    { label: "Free · Điểm %", criterion: "Điểm %", category: "Free" as const, value: percent(value.freestylePercent) },
     { label: "Pattern · One / Many", criterion: "One / Many", category: "Pattern" as const, value: choice(matrix.pattern.oneOrMany) },
     { label: "Free · One / Many", criterion: "One / Many", category: "Free" as const, value: choice(matrix.free.oneOrMany) },
     { label: "Pattern · Am / Is / Are", criterion: "Am / Is / Are", category: "Pattern" as const, value: choice(matrix.pattern.amIsAre) },
     { label: "Free · Am / Is / Are", criterion: "Am / Is / Are", category: "Free" as const, value: choice(matrix.free.amIsAre) },
-  ];
+  ]; })();
+  if (!Array.isArray(evaluation.unitEvaluations)) return rows(evaluation);
+  return evaluation.unitEvaluations.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const entry = item as Record<string, unknown>;
+    const numbers = Array.isArray(entry.unitNumbers) ? entry.unitNumbers.filter((number): number is number => typeof number === "number") : [];
+    const labels = numbers.map((number) => curriculumDefaults.find((unit) => unit.programCode === check.programCode && unit.unitNumber === number)?.unitLabel || `Unit ${number}`);
+    const unitLabel = program?.group === "baby" && labels.length > 1 ? `All reviews · ${labels.join(", ")}` : labels.join(", ") || check.unitLabel;
+    return rows(entry).map((criterion) => ({ ...criterion, unitLabel }));
+  });
 }
 
 function EvaluationCriteriaGrid({ criteria }: { criteria: EvaluationCriterion[] }) {
+  const labels = Array.from(new Set(criteria.map((item) => item.unitLabel).filter((label): label is string => Boolean(label))));
+  if (labels.length) return <div className="mt-2 space-y-3">{labels.map((label) => <div key={label} className="rounded-lg border bg-slate-50 p-3"><p className="mb-2 text-sm font-bold text-[#143b63]">{label}</p><EvaluationCriteriaGrid criteria={criteria.filter((item) => item.unitLabel === label).map((item) => ({ ...item, unitLabel: undefined }))} /></div>)}</div>;
   const matrix = criteria.some((item) => item.category);
   if (!matrix) {
     return <div className="mt-2 grid gap-2 sm:grid-cols-2">{criteria.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label}</span><strong>{criterion.value}</strong></div>)}</div>;

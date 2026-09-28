@@ -36,10 +36,9 @@ import { isCompleteCambridgeEvaluation, normalizeCambridgeEvaluation, type Cambr
 import { curriculumDefaults, curriculumKey, programByLabel, programs, type CurriculumUnit, type LearningCheck, type ProgramGroup } from "@/lib/curriculum";
 import {
   defaultFreestyleBanks,
-  eligibleFreestyleCategories,
   findFreestyleCategoryForQuestions,
   flattenFreestyleCategories,
-  sampleFreestyleQuestionsFromCategory,
+  freestyleCategoryQuestions,
   splitFreestyleQuestions,
   type FreestyleBank,
   type FreestyleQuestionCategory,
@@ -47,6 +46,7 @@ import {
 } from "@/lib/speaking-questions";
 import { vietnamToday } from "@/lib/weekly-history";
 import { parseVocabularyGroups } from "@/lib/vocabulary";
+import { evaluationGroups, type EvaluationGroup } from "@/lib/unit-evaluation";
 
 type ClassInfo = { id: number; name: string; level: string; schedule: string; teacherName: string | null };
 type StudentInfo = { id: number; name: string; classId: number | null; className: string | null; level: string };
@@ -134,6 +134,28 @@ function parseList(value?: string) {
   try { const parsed = value ? JSON.parse(value) : []; return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : []; } catch { return []; }
 }
 
+type UnitScore = {
+  spellingPercent: string; writingPercent: string; vocabularyCorrect: string; communicationPercent: string; pronunciation: string;
+  patternPercent: string; freestylePercent: string; patternPronunciation: string; freePronunciation: string;
+  patternOneOrMany: string; freeOneOrMany: string; patternAmIsAre: string; freeAmIsAre: string;
+  freestyleCategory: string; freestyleQuestions: string[];
+};
+
+function UnitEvaluationCard({ group, programLabel, programGroup, studentName, className, score, onChange, freestyleCategories, topicOptions, editing }: {
+  group: EvaluationGroup; programLabel: string; programGroup: ProgramGroup; studentName: string; className: string;
+  score: UnitScore; onChange: (patch: Partial<UnitScore>) => void; freestyleCategories: FreestyleQuestionCategory[];
+  topicOptions: FreestyleQuestionCategory[]; editing: boolean;
+}) {
+  const set = (key: keyof UnitScore) => (value: string) => onChange({ [key]: value });
+  const max = group.units.reduce((sum, item) => sum + item.vocabularyMax, 0);
+  const questions = splitFreestyleQuestions(score.freestyleQuestions, freestyleCategories);
+  return <Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="text-xl">Evaluation Criteria · {group.label}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{studentName} · {className}</p></div><ProgramBadge group={programGroup}>{programLabel}</ProgramBadge></div></CardHeader><CardContent className="space-y-4 p-5">
+    {programGroup === "baby" && <><div className="grid gap-3 sm:grid-cols-2"><NumberScore id={`spelling-${group.unitNumbers[0]}`} label="SPELLING" value={score.spellingPercent} onChange={set("spellingPercent")} /><NumberScore id={`writing-${group.unitNumbers[0]}`} label="WRITING" value={score.writingPercent} onChange={set("writingPercent")} /></div><div className="rounded-xl border bg-rose-50/50 p-4"><p className="mb-2 text-sm font-bold">Freestyle questions · Baby Stars</p><ul className="grid gap-2 sm:grid-cols-2">{flattenFreestyleCategories(freestyleCategories).map((question) => <li key={question} className="text-sm">• {question}</li>)}</ul></div></>}
+    {programGroup === "super" && <><NumberScore id={`vocabulary-${group.unitNumbers[0]}`} label="VOCABULARY" value={score.vocabularyCorrect} onChange={set("vocabularyCorrect")} max={max || 10} suffix={`/ ${max || 10}`} /><NumberScore id={`communication-${group.unitNumbers[0]}`} label="COMMUNICATION" value={score.communicationPercent} onChange={set("communicationPercent")} /><PronunciationChoice value={score.pronunciation} onChange={set("pronunciation")} /></>}
+    {programGroup === "cambridge" && <><div className="rounded-lg bg-sky-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-sky-800">Communication</div><div className="overflow-hidden rounded-xl border bg-white"><div className="border-b px-4 py-3"><p className="text-sm font-bold">Freestyle questions</p><p className="mt-0.5 text-xs text-muted-foreground">Toàn bộ câu hỏi trong chủ đề đã chọn của level {programLabel}.</p></div><div className="border-b bg-slate-50/70 px-4 py-3"><Label className="mb-2">Chủ đề Freestyle</Label><Picker value={score.freestyleCategory} onChange={(value) => { const category = topicOptions.find((item) => item.category === value); onChange({ freestyleCategory: value, freestyleQuestions: category ? freestyleCategoryQuestions(category) : [] }); }} placeholder="Chọn chủ đề có câu hỏi" disabled={editing} options={topicOptions.map((category) => ({ value: category.category, label: `${category.category} · ${freestyleCategoryQuestions(category).length} câu` }))} /></div>{score.freestyleQuestions.length ? <div><p className="border-b bg-sky-50/50 px-4 py-2 text-xs font-semibold text-sky-800">Chủ đề: {score.freestyleCategory || "Kết quả đã lưu trước đây"}</p><div className="grid md:grid-cols-2"><FreestyleQuestionColumn title="YES / NO" questions={questions.yesNo} /><FreestyleQuestionColumn title="WH QUESTIONS" questions={questions.wh} className="border-t md:border-l md:border-t-0" /></div></div> : <p className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Chưa có câu hỏi Freestyle. Hãy bổ sung tại Khung chương trình trước khi kiểm tra.</p>}</div><div><div className="mb-2"><p className="text-sm font-bold">Evaluation matrix</p><p className="text-xs text-muted-foreground">Pronunciation được chấm riêng cho Pattern và Free; mỗi phần có điểm % riêng.</p></div><CambridgeEvaluationMatrix patternPronunciation={score.patternPronunciation} setPatternPronunciation={set("patternPronunciation")} freePronunciation={score.freePronunciation} setFreePronunciation={set("freePronunciation")} patternPercent={score.patternPercent} setPatternPercent={set("patternPercent")} freestylePercent={score.freestylePercent} setFreestylePercent={set("freestylePercent")} patternOneOrMany={score.patternOneOrMany} setPatternOneOrMany={set("patternOneOrMany")} freeOneOrMany={score.freeOneOrMany} setFreeOneOrMany={set("freeOneOrMany")} patternAmIsAre={score.patternAmIsAre} setPatternAmIsAre={set("patternAmIsAre")} freeAmIsAre={score.freeAmIsAre} setFreeAmIsAre={set("freeAmIsAre")} /></div></>}
+  </CardContent></Card>;
+}
+
 type StudentCheckProps = {
   classes: ClassInfo[];
   students: StudentInfo[];
@@ -157,7 +179,6 @@ type StudentCheckProps = {
 
 export function CurriculumStudentCheck({ classes, students, curriculum, freestyleBanks, levelOptions, feedbackOptions, selectedClassId, setSelectedClassId, selectedStudentId, setSelectedStudentId, onSaved, openFeedbackOptions, canManage = true, embedded = false, editingCheck = null, initialCheckedAt, initialUnitNumbers, queueId }: StudentCheckProps) {
   const initialEvaluation = parseObject(editingCheck?.evaluationJson);
-  const initialCambridge = normalizeCambridgeEvaluation(initialEvaluation);
   const initialFeedback = parseList(editingCheck?.feedbackJson);
   const filteredStudents = students.filter((student) => !selectedClassId || String(student.classId) === selectedClassId);
   const student = students.find((item) => String(item.id) === selectedStudentId);
@@ -171,68 +192,80 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
   const levelFreestyleCategories = speakingProgramCode
     ? freestyleBank?.categories ?? defaultFreestyleBanks[speakingProgramCode] ?? []
     : [];
-  const freestyleTopicOptions = eligibleFreestyleCategories(levelFreestyleCategories);
-  const savedFreestyleQuestions = Array.isArray(initialEvaluation.freestyleQuestions) ? initialEvaluation.freestyleQuestions.filter((item): item is string => typeof item === "string") : [];
-  const savedFreestyleCategory = typeof initialEvaluation.freestyleCategory === "string" ? initialEvaluation.freestyleCategory : "";
-  const inferredFreestyleCategory = findFreestyleCategoryForQuestions(savedFreestyleQuestions, levelFreestyleCategories)?.category || "";
-  const matchedFreestyleCategory = freestyleTopicOptions.find((category) => category.category === savedFreestyleCategory || category.category === inferredFreestyleCategory);
-  const initialFreestyleCategory = matchedFreestyleCategory ?? (!editingCheck || !savedFreestyleQuestions.length ? freestyleTopicOptions[0] : undefined);
+  const freestyleTopicOptions = levelFreestyleCategories.filter((category) => freestyleCategoryQuestions(category).length > 0);
   const savedUnitNumbers = Array.isArray(initialEvaluation.unitNumbers)
     ? initialEvaluation.unitNumbers.filter((value): value is number => typeof value === "number" && Number.isInteger(value))
     : editingCheck ? [editingCheck.unitNumber] : [];
   const [unitNumbers, setUnitNumbers] = useState<number[]>(initialUnitNumbers?.length ? initialUnitNumbers : savedUnitNumbers.length ? savedUnitNumbers : programUnits[0] ? [programUnits[0].unitNumber] : []);
   const selectedUnits = programUnits.filter((item) => unitNumbers.includes(item.unitNumber));
+  const groups = evaluationGroups(selectedUnits);
   const unit = selectedUnits[0];
-  const vocabularyMax = selectedUnits.reduce((sum, item) => sum + item.vocabularyMax, 0);
   const [checkedAt, setCheckedAt] = useState(editingCheck?.checkedAt || initialCheckedAt || vietnamToday());
   const [notes, setNotes] = useState(editingCheck?.notes || "");
   const [selectedFeedbackIds, setSelectedFeedbackIds] = useState<number[]>(feedbackOptions.filter((item) => initialFeedback.includes(item.label)).map((item) => item.id));
-  const [spellingPercent, setSpellingPercent] = useState(String(initialEvaluation.spellingPercent ?? ""));
-  const [writingPercent, setWritingPercent] = useState(String(initialEvaluation.writingPercent ?? ""));
-  const [vocabularyCorrect, setVocabularyCorrect] = useState(String(initialEvaluation.vocabularyCorrect ?? ""));
-  const [communicationPercent, setCommunicationPercent] = useState(String(initialEvaluation.communicationPercent ?? ""));
-  const [pronunciation, setPronunciation] = useState(String(initialEvaluation.pronunciation || ""));
-  const [patternPronunciation, setPatternPronunciation] = useState<string>(initialCambridge.pattern.pronunciation);
-  const [freePronunciation, setFreePronunciation] = useState<string>(initialCambridge.free.pronunciation);
-  const [patternPercent, setPatternPercent] = useState(String(initialEvaluation.patternPercent ?? ""));
-  const [freestylePercent, setFreestylePercent] = useState(String(initialEvaluation.freestylePercent ?? ""));
-  const [patternOneOrMany, setPatternOneOrMany] = useState<string>(initialCambridge.pattern.oneOrMany);
-  const [freeOneOrMany, setFreeOneOrMany] = useState<string>(initialCambridge.free.oneOrMany);
-  const [patternAmIsAre, setPatternAmIsAre] = useState<string>(initialCambridge.pattern.amIsAre);
-  const [freeAmIsAre, setFreeAmIsAre] = useState<string>(initialCambridge.free.amIsAre);
-  const [freestyleCategory, setFreestyleCategory] = useState(initialFreestyleCategory?.category || savedFreestyleCategory || inferredFreestyleCategory);
-  const [freestyleQuestions, setFreestyleQuestions] = useState<string[]>(savedFreestyleQuestions.length ? savedFreestyleQuestions : initialFreestyleCategory ? sampleFreestyleQuestionsFromCategory(initialFreestyleCategory) : []);
+  const [scores, setScores] = useState<Record<string, UnitScore>>({});
+  const savedScores = Array.isArray(initialEvaluation.unitEvaluations) ? initialEvaluation.unitEvaluations.filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value)) : [];
+  const scoreFor = (group: EvaluationGroup): UnitScore => {
+    const key = group.unitNumbers.join(",");
+    if (scores[key]) return scores[key];
+    const stored = savedScores.find((value) => Array.isArray(value.unitNumbers) && group.unitNumbers.every((number) => (value.unitNumbers as number[]).includes(number)) && (value.unitNumbers as number[]).length === group.unitNumbers.length);
+    const source = stored || (editingCheck && !savedScores.length ? initialEvaluation : {});
+    const questions = Array.isArray(source.freestyleQuestions) ? source.freestyleQuestions.filter((value): value is string => typeof value === "string") : [];
+    const categoryName = typeof source.freestyleCategory === "string" ? source.freestyleCategory : findFreestyleCategoryForQuestions(questions, levelFreestyleCategories)?.category || "";
+    const category = freestyleTopicOptions.find((item) => item.category === categoryName);
+    const matrix = normalizeCambridgeEvaluation(source);
+    return {
+      spellingPercent: String(source.spellingPercent ?? ""), writingPercent: String(source.writingPercent ?? ""),
+      vocabularyCorrect: source.vocabularyCorrect === undefined ? "" : String(stored ? source.vocabularyCorrect : Math.min(Number(source.vocabularyCorrect), group.units.reduce((sum, item) => sum + item.vocabularyMax, 0))), communicationPercent: String(source.communicationPercent ?? ""),
+      pronunciation: String(source.pronunciation || ""), patternPercent: String(source.patternPercent ?? ""), freestylePercent: String(source.freestylePercent ?? ""),
+      patternPronunciation: matrix.pattern.pronunciation, freePronunciation: matrix.free.pronunciation,
+      patternOneOrMany: matrix.pattern.oneOrMany, freeOneOrMany: matrix.free.oneOrMany,
+      patternAmIsAre: matrix.pattern.amIsAre, freeAmIsAre: matrix.free.amIsAre,
+      freestyleCategory: categoryName, freestyleQuestions: questions.length ? questions : category ? freestyleCategoryQuestions(category) : [],
+    };
+  };
+  const updateScore = (group: EvaluationGroup, patch: Partial<UnitScore>) => {
+    const key = group.unitNumbers.join(",");
+    setScores((current) => ({ ...current, [key]: { ...scoreFor(group), ...current[key], ...patch } }));
+  };
   const [saving, setSaving] = useState(false);
 
   const resetEvaluation = () => {
-    const firstTopic = freestyleTopicOptions[0];
-    setSpellingPercent(""); setWritingPercent(""); setVocabularyCorrect(""); setCommunicationPercent(""); setPronunciation(""); setPatternPronunciation(""); setFreePronunciation(""); setPatternPercent(""); setFreestylePercent(""); setPatternOneOrMany(""); setFreeOneOrMany(""); setPatternAmIsAre(""); setFreeAmIsAre(""); setNotes(""); setSelectedFeedbackIds([]);
-    setFreestyleCategory(firstTopic?.category || "");
-    setFreestyleQuestions(firstTopic ? sampleFreestyleQuestionsFromCategory(firstTopic) : []);
+    setScores({}); setNotes(""); setSelectedFeedbackIds([]);
   };
 
   const percent = (value: string) => Math.min(100, Math.max(0, Number(value) || 0));
-  const vocabularyPercent = vocabularyMax ? (Math.min(vocabularyMax, Math.max(0, Number(vocabularyCorrect) || 0)) / vocabularyMax) * 100 : 0;
-  const cambridgeEvaluation = {
-    pattern: { pronunciation: patternPronunciation as CambridgePronunciation | "", oneOrMany: patternOneOrMany as CambridgeBinary | "", amIsAre: patternAmIsAre as CambridgeBinary | "" },
-    free: { pronunciation: freePronunciation as CambridgePronunciation | "", oneOrMany: freeOneOrMany as CambridgeBinary | "", amIsAre: freeAmIsAre as CambridgeBinary | "" },
-  };
-  const patternScore = percent(patternPercent);
-  const freestyleScore = percent(freestylePercent);
-  const overallPercent = !program ? 0 : program.group === "baby" ? (percent(spellingPercent) + percent(writingPercent)) / 2 : program.group === "super" ? (vocabularyPercent + percent(communicationPercent)) / 2 : (patternScore + freestyleScore) / 2;
-  const complete = program?.group === "baby" ? spellingPercent !== "" && writingPercent !== "" : program?.group === "super" ? vocabularyCorrect !== "" && communicationPercent !== "" && Boolean(pronunciation) : patternPercent !== "" && freestylePercent !== "" && freestyleQuestions.length === 5 && isCompleteCambridgeEvaluation(cambridgeEvaluation);
-  const hasRedflagComponent = program?.group === "baby" ? percent(spellingPercent) < 50 || percent(writingPercent) < 50 : program?.group === "super" ? vocabularyPercent < 70 || percent(communicationPercent) < 60 : patternScore < 60 || freestyleScore < 60;
+  const complete = groups.length > 0 && groups.every((group) => {
+    const score = scoreFor(group);
+    if (program?.group === "baby") return score.spellingPercent !== "" && score.writingPercent !== "";
+    if (program?.group === "super") return score.vocabularyCorrect !== "" && score.communicationPercent !== "" && Boolean(score.pronunciation);
+    return score.patternPercent !== "" && score.freestylePercent !== "" && score.freestyleQuestions.length > 0 && isCompleteCambridgeEvaluation({
+      pattern: { pronunciation: score.patternPronunciation as CambridgePronunciation | "", oneOrMany: score.patternOneOrMany as CambridgeBinary | "", amIsAre: score.patternAmIsAre as CambridgeBinary | "" },
+      free: { pronunciation: score.freePronunciation as CambridgePronunciation | "", oneOrMany: score.freeOneOrMany as CambridgeBinary | "", amIsAre: score.freeAmIsAre as CambridgeBinary | "" },
+    });
+  });
+  const components = groups.flatMap((group) => {
+    const score = scoreFor(group);
+    if (program?.group === "baby") return [percent(score.spellingPercent), percent(score.writingPercent)];
+    if (program?.group === "super") return [Math.min(100, Number(score.vocabularyCorrect) / Math.max(1, group.units.reduce((sum, item) => sum + item.vocabularyMax, 0)) * 100) || 0, percent(score.communicationPercent)];
+    return [percent(score.patternPercent), percent(score.freestylePercent)];
+  });
+  const overallPercent = components.reduce((sum, value) => sum + value, 0) / Math.max(components.length, 1);
+  const hasRedflagComponent = components.some((value, index) => value < (program?.group === "baby" ? 50 : program?.group === "super" ? index % 2 ? 60 : 70 : 60));
   const previewResult = !complete ? "Chưa đủ dữ liệu" : hasRedflagComponent ? "Redflag" : overallPercent > 80 ? "Good" : "Average";
-  const selectedFreestyleTopic = levelFreestyleCategories.find((category) => category.category === freestyleCategory);
-  const groupedFreestyleQuestions = splitFreestyleQuestions(freestyleQuestions, levelFreestyleCategories);
 
   const save = async () => {
     if (!student || !program || !unit || !complete) return;
-    const evaluation = program.group === "baby"
-      ? { spellingPercent: Number(spellingPercent), writingPercent: Number(writingPercent) }
-      : program.group === "super"
-        ? { vocabularyCorrect: Number(vocabularyCorrect), vocabularyMax, communicationPercent: Number(communicationPercent), pronunciation }
-        : { patternPercent: Number(patternPercent), freestylePercent: Number(freestylePercent), pattern: cambridgeEvaluation.pattern, free: cambridgeEvaluation.free, freestyleCategory, freestyleQuestions };
+    const unitEvaluations = groups.map((group) => {
+      const score = scoreFor(group);
+      const fields = program.group === "baby"
+        ? { spellingPercent: Number(score.spellingPercent), writingPercent: Number(score.writingPercent) }
+        : program.group === "super"
+          ? { vocabularyCorrect: Number(score.vocabularyCorrect), vocabularyMax: group.units.reduce((sum, item) => sum + item.vocabularyMax, 0), communicationPercent: Number(score.communicationPercent), pronunciation: score.pronunciation }
+          : { patternPercent: Number(score.patternPercent), freestylePercent: Number(score.freestylePercent), pattern: { pronunciation: score.patternPronunciation, oneOrMany: score.patternOneOrMany, amIsAre: score.patternAmIsAre }, free: { pronunciation: score.freePronunciation, oneOrMany: score.freeOneOrMany, amIsAre: score.freeAmIsAre }, freestyleCategory: score.freestyleCategory, freestyleQuestions: score.freestyleQuestions };
+      return { unitNumbers: group.unitNumbers, ...fields };
+    });
+    const evaluation = { unitEvaluations };
     const preservedFeedback = initialFeedback.filter((label) => !feedbackOptions.some((option) => option.label === label));
     const feedback = Array.from(new Set([...preservedFeedback, ...feedbackOptions.filter((item) => selectedFeedbackIds.includes(item.id)).map((item) => item.label)]));
     setSaving(true);
@@ -252,11 +285,9 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
     {embedded ? <Card className="border-0 bg-slate-50 shadow-none"><CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,1fr)]"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Học viên đã chọn</p><p className="mt-1 font-bold text-[#102233]">{student?.name}</p><p className="text-sm text-muted-foreground">{classInfo?.name || "Chưa xếp lớp"} · {student?.level}</p></div><div><Label className="mb-2">Nội dung kiểm tra</Label><UnitSelector units={programUnits} selected={unitNumbers} disabled={Boolean(editingCheck) || Boolean(queueId)} onChange={(value) => { setUnitNumbers(value); resetEvaluation(); }} /></div></CardContent></Card> : <Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardContent className="grid gap-4 p-5 lg:grid-cols-3"><div><Label className="mb-2">1. Lớp học</Label><Picker value={selectedClassId} onChange={(value) => { setSelectedClassId(value); setUnitNumbers([]); resetEvaluation(); setSelectedStudentId(""); }} placeholder="Chọn lớp" options={classes.map((item) => ({ value: String(item.id), label: item.name }))} /></div><div><Label className="mb-2">2. Học viên</Label><Picker value={selectedStudentId} onChange={(value) => { setUnitNumbers([]); resetEvaluation(); setSelectedStudentId(value); }} placeholder="Chọn học viên" disabled={!selectedClassId} options={filteredStudents.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.level}` }))} /></div><div><Label className="mb-2">3. Nội dung kiểm tra</Label><UnitSelector units={programUnits} selected={unitNumbers} disabled={Boolean(editingCheck) || Boolean(queueId)} onChange={(value) => { setUnitNumbers(value); resetEvaluation(); }} /></div></CardContent></Card>}
     {student && !program ? <EmptyBox title="Chưa xác định đúng chương trình" description={`Học viên đang được đặt trình độ “${student.level}”. Hãy chỉnh thành Baby Stars, Super Kids 1–8, Starters, Movers hoặc Flyers.`} /> : null}
     {student && program && unit ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,.75fr)]">
-      <div className="space-y-5">{selectedUnits.map((item) => <CurriculumReference key={item.unitNumber} unit={item} />)}<Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="text-xl">Evaluation Criteria</CardTitle><p className="mt-1 text-sm text-muted-foreground">{student.name} · {classInfo?.name}</p></div><ProgramBadge group={program.group}>{program.label}</ProgramBadge></div></CardHeader><CardContent className="space-y-4 p-5">
-        {program.group === "baby" ? <><div className="grid gap-3 sm:grid-cols-2"><NumberScore id="spelling" label="SPELLING" value={spellingPercent} onChange={setSpellingPercent} /><NumberScore id="writing" label="WRITING" value={writingPercent} onChange={setWritingPercent} /></div><div className="rounded-xl border bg-rose-50/50 p-4"><p className="mb-2 text-sm font-bold">Freestyle questions · Baby Stars</p><ul className="grid gap-2 sm:grid-cols-2">{flattenFreestyleCategories(levelFreestyleCategories).map((question) => <li key={question} className="text-sm">• {question}</li>)}</ul></div></> : null}
-        {program.group === "super" ? <><NumberScore id="vocabulary" label="VOCABULARY" value={vocabularyCorrect} onChange={setVocabularyCorrect} max={vocabularyMax || 10} suffix={`/ ${vocabularyMax || 10}`} /><NumberScore id="communication" label="COMMUNICATION" value={communicationPercent} onChange={setCommunicationPercent} /><PronunciationChoice value={pronunciation} onChange={setPronunciation} /></> : null}
-        {program.group === "cambridge" ? <><div className="rounded-lg bg-sky-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-sky-800">Communication</div><div className="overflow-hidden rounded-xl border bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"><div><p className="text-sm font-bold">Freestyle questions</p><p className="mt-0.5 text-xs text-muted-foreground">5 câu được lấy ngẫu nhiên trong cùng một chủ đề của level {program.label}.</p></div><Button type="button" size="sm" variant="outline" disabled={!selectedFreestyleTopic || Boolean(editingCheck)} onClick={() => selectedFreestyleTopic && setFreestyleQuestions(sampleFreestyleQuestionsFromCategory(selectedFreestyleTopic))}><RefreshCw /> Đổi 5 câu</Button></div><div className="border-b bg-slate-50/70 px-4 py-3"><Label className="mb-2">Chủ đề Freestyle</Label><Picker value={freestyleCategory} onChange={(value) => { setFreestyleCategory(value); const topic = freestyleTopicOptions.find((category) => category.category === value); setFreestyleQuestions(topic ? sampleFreestyleQuestionsFromCategory(topic) : []); }} placeholder="Chọn chủ đề có ít nhất 5 câu" disabled={Boolean(editingCheck)} options={freestyleTopicOptions.map((category) => ({ value: category.category, label: `${category.category} · ${category.yesNoQuestions.length + category.whQuestions.length} câu` }))} /></div>{freestyleQuestions.length === 5 ? <div><p className="border-b bg-sky-50/50 px-4 py-2 text-xs font-semibold text-sky-800">Chủ đề: {freestyleCategory || "Kết quả đã lưu trước đây"}</p><div className="grid md:grid-cols-2"><FreestyleQuestionColumn title="YES / NO" questions={groupedFreestyleQuestions.yesNo} /><FreestyleQuestionColumn title="WH QUESTIONS" questions={groupedFreestyleQuestions.wh} className="border-t md:border-l md:border-t-0" /></div></div> : <p className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Chưa có chủ đề nào đủ 5 câu. Hãy bổ sung câu hỏi theo từng chủ đề tại Khung chương trình trước khi kiểm tra.</p>}</div><div><div className="mb-2"><p className="text-sm font-bold">Evaluation matrix</p><p className="text-xs text-muted-foreground">Pronunciation được chấm riêng cho Pattern và Free; mỗi phần có điểm % riêng.</p></div><CambridgeEvaluationMatrix patternPronunciation={patternPronunciation} setPatternPronunciation={setPatternPronunciation} freePronunciation={freePronunciation} setFreePronunciation={setFreePronunciation} patternPercent={patternPercent} setPatternPercent={setPatternPercent} freestylePercent={freestylePercent} setFreestylePercent={setFreestylePercent} patternOneOrMany={patternOneOrMany} setPatternOneOrMany={setPatternOneOrMany} freeOneOrMany={freeOneOrMany} setFreeOneOrMany={setFreeOneOrMany} patternAmIsAre={patternAmIsAre} setPatternAmIsAre={setPatternAmIsAre} freeAmIsAre={freeAmIsAre} setFreeAmIsAre={setFreeAmIsAre} /></div></> : null}
-      </CardContent></Card></div>
+      <div className="space-y-5">{selectedUnits.map((item) => <CurriculumReference key={item.unitNumber} unit={item} />)}
+        {groups.map((group) => <UnitEvaluationCard key={group.unitNumbers.join(",")} group={group} programLabel={program.label} programGroup={program.group} studentName={student.name} className={classInfo?.name || ""} score={scoreFor(group)} onChange={(patch) => updateScore(group, patch)} freestyleCategories={levelFreestyleCategories} topicOptions={freestyleTopicOptions} editing={Boolean(editingCheck)} />)}
+      </div>
       <Card className="h-fit border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-lg">{editingCheck ? "Cập nhật kết quả" : "Kết quả kiểm tra"}</CardTitle><Badge variant="outline">{previewResult}</Badge></div></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="check-date">Ngày đánh giá</Label><Input id="check-date" type="date" value={checkedAt} onChange={(event) => setCheckedAt(event.target.value)} /></div><div className="space-y-3"><div className="flex items-center justify-between gap-3"><Label>Nhận xét thường gặp</Label>{canManage ? <Button type="button" size="sm" variant="ghost" onClick={openFeedbackOptions}><Settings2 /> Quản lý</Button> : null}</div>{feedbackOptions.filter((item) => item.active).length ? <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border bg-slate-50/70 p-3">{Array.from(new Set(feedbackOptions.filter((item) => item.active).map((item) => item.category))).map((category) => <div key={category}><p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{category}</p><div className="space-y-2">{feedbackOptions.filter((item) => item.active && item.category === category).map((item) => <label key={item.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-sm leading-5 shadow-sm"><Checkbox checked={selectedFeedbackIds.includes(item.id)} onCheckedChange={(checked) => setSelectedFeedbackIds((current) => checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span>{item.label}</span></label>)}</div></div>)}</div> : canManage ? <Button type="button" variant="outline" className="w-full" onClick={openFeedbackOptions}><Settings2 /> Thêm mẫu nhận xét</Button> : <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Chưa có mẫu nhận xét đang sử dụng.</p>}</div><div><Label htmlFor="check-notes">Nhận xét / lý do khác</Label><Textarea id="check-notes" value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} placeholder="Nhập nội dung khác ngoài các lựa chọn phía trên..." /></div><Button className="w-full bg-[#ff7a3d] hover:bg-[#e9652f]" disabled={!complete || saving} onClick={save}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />} {editingCheck ? "Cập nhật kết quả" : "Lưu đánh giá"}</Button></CardContent></Card>
     </div> : null}
     {!student ? <EmptyBox title="Chọn học viên" description="Mở danh sách học viên trong một thẻ lớp và chọn Kiểm tra ngay." /> : null}
@@ -343,7 +374,7 @@ function FreestyleBankEditor({ bank, onClose, onSaved }: { bank: FreestyleBank; 
     }
   };
 
-  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-4xl"><DialogHeader><DialogTitle>Freestyle chung · {bank.programLabel}</DialogTitle><DialogDescription>Các câu hỏi tại đây áp dụng cho toàn bộ level, không phụ thuộc Unit. Nhập mỗi câu trên một dòng; có thể lưu trống và bổ sung sau.</DialogDescription></DialogHeader><div className="space-y-4 py-2">{categories.map((category, index) => <div key={category.id} className="space-y-3 rounded-xl border bg-slate-50/70 p-4"><div className="flex items-end gap-2"><div className="flex-1"><Label htmlFor={`category-${category.id}`}>Tên nhóm chủ đề</Label><Input id={`category-${category.id}`} value={category.category} maxLength={100} onChange={(event) => updateCategory(category.id, { category: event.target.value })} placeholder="Ví dụ: Personal information" /></div><Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={() => setCategories((current) => current.filter((item) => item.id !== category.id))} aria-label={`Xóa nhóm ${index + 1}`}><Trash2 /></Button></div><div className="grid gap-3 md:grid-cols-2"><Field label={`YES / NO · ${questionsFromText(category.yesNoText).length} câu`}><Textarea rows={8} value={category.yesNoText} onChange={(event) => updateCategory(category.id, { yesNoText: event.target.value })} placeholder="Mỗi câu trên một dòng..." /></Field><Field label={`WH QUESTIONS · ${questionsFromText(category.whText).length} câu`}><Textarea rows={8} value={category.whText} onChange={(event) => updateCategory(category.id, { whText: event.target.value })} placeholder="Mỗi câu trên một dòng..." /></Field></div></div>)}<Button type="button" variant="outline" onClick={() => setCategories((current) => [...current, { id: `new-${Date.now()}-${current.length}`, category: "", yesNoText: "", whText: "" }])}><Plus /> Thêm nhóm chủ đề</Button><div className={`rounded-lg border p-3 text-sm ${total >= 5 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>Hiện có {total} câu. {total >= 5 ? "Đã đủ để hệ thống chọn ngẫu nhiên 5 câu cho mỗi lượt kiểm tra." : "Cần ít nhất 5 câu để bắt đầu lượt kiểm tra mới."}</div></div><DialogFooter><Button variant="outline" onClick={onClose}>Hủy</Button><Button onClick={save} disabled={saving}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />} Lưu ngân hàng</Button></DialogFooter></DialogContent></Dialog>;
+  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-4xl"><DialogHeader><DialogTitle>Freestyle chung · {bank.programLabel}</DialogTitle><DialogDescription>Các câu hỏi tại đây áp dụng cho toàn bộ level, không phụ thuộc Unit. Nhập mỗi câu trên một dòng; có thể lưu trống và bổ sung sau.</DialogDescription></DialogHeader><div className="space-y-4 py-2">{categories.map((category, index) => <div key={category.id} className="space-y-3 rounded-xl border bg-slate-50/70 p-4"><div className="flex items-end gap-2"><div className="flex-1"><Label htmlFor={`category-${category.id}`}>Tên nhóm chủ đề</Label><Input id={`category-${category.id}`} value={category.category} maxLength={100} onChange={(event) => updateCategory(category.id, { category: event.target.value })} placeholder="Ví dụ: Personal information" /></div><Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={() => setCategories((current) => current.filter((item) => item.id !== category.id))} aria-label={`Xóa nhóm ${index + 1}`}><Trash2 /></Button></div><div className="grid gap-3 md:grid-cols-2"><Field label={`YES / NO · ${questionsFromText(category.yesNoText).length} câu`}><Textarea rows={8} value={category.yesNoText} onChange={(event) => updateCategory(category.id, { yesNoText: event.target.value })} placeholder="Mỗi câu trên một dòng..." /></Field><Field label={`WH QUESTIONS · ${questionsFromText(category.whText).length} câu`}><Textarea rows={8} value={category.whText} onChange={(event) => updateCategory(category.id, { whText: event.target.value })} placeholder="Mỗi câu trên một dòng..." /></Field></div></div>)}<Button type="button" variant="outline" onClick={() => setCategories((current) => [...current, { id: `new-${Date.now()}-${current.length}`, category: "", yesNoText: "", whText: "" }])}><Plus /> Thêm nhóm chủ đề</Button><div className={`rounded-lg border p-3 text-sm ${total >= 1 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>Hiện có {total} câu. {total >= 1 ? "Hãy chọn chủ đề để hiển thị toàn bộ câu hỏi." : "Cần ít nhất một câu trong chủ đề để bắt đầu lượt kiểm tra mới."}</div></div><DialogFooter><Button variant="outline" onClick={onClose}>Hủy</Button><Button onClick={save} disabled={saving}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />} Lưu ngân hàng</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function CurriculumEditor({ unit, onClose, onSaved }: { unit: CurriculumUnit; onClose: () => void; onSaved: () => Promise<void> | void }) {

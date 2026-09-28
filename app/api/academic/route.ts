@@ -25,6 +25,7 @@ import {
   normalizeCambridgeEvaluation,
 } from "@/lib/cambridge-evaluation";
 import { validDate } from "@/lib/weekly-history";
+import { evaluationGroups } from "@/lib/unit-evaluation";
 import { isInStudentHistoryWindow, pruneExpiredStudentHistory } from "@/lib/history-retention";
 import {
   defaultFreestyleBanks,
@@ -40,7 +41,7 @@ type ScoreItem = { criterionId: number; score: number; note?: string };
 const now = () => new Date().toISOString();
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 const questionList = (value: unknown) => Array.isArray(value)
-  ? Array.from(new Set(value.map(text).filter(Boolean))).slice(0, 200)
+  ? Array.from(new Set(value.map(text).filter(Boolean))).slice(0, 400)
   : [];
 const storedFreestyleCategories = (value: string, fallback: FreestyleQuestionCategory[]) => {
   try {
@@ -639,75 +640,80 @@ export async function POST(request: Request) {
         return override ? { ...unit, topic: override.topic, vocabularyMax: override.vocabularyMax } : unit;
       });
 
-      const clampPercent = (value: unknown) =>
-        Math.min(100, Math.max(0, Number(value) || 0));
-      let componentPercentages: number[] = [];
-      let hasRedflagComponent = false;
-
-      if (program.group === "baby") {
-        const spellingPercent = clampPercent(evaluation.spellingPercent);
-        const writingPercent = clampPercent(evaluation.writingPercent);
-        componentPercentages = [spellingPercent, writingPercent];
-        hasRedflagComponent = spellingPercent < 50 || writingPercent < 50;
-      } else if (program.group === "super") {
-        const vocabularyMax = Math.max(1, selectedUnits.reduce((sum, unit) => sum + unit.vocabularyMax, 0));
-        const vocabularyCorrect = Math.min(
-          vocabularyMax,
-          Math.max(0, Number(evaluation.vocabularyCorrect) || 0)
-        );
-        const pronunciation = text(evaluation.pronunciation);
-        if (!['clear', 'unclear'].includes(pronunciation)) {
-          return fail("Vui lòng chọn kết quả phát âm Clear hoặc Unclear.");
-        }
-        const vocabularyPercent = (vocabularyCorrect / vocabularyMax) * 100;
-        const communicationPercent = clampPercent(evaluation.communicationPercent);
-        componentPercentages = [vocabularyPercent, communicationPercent];
-        hasRedflagComponent = vocabularyPercent < 70 || communicationPercent < 60;
-      } else {
-        const matrix = normalizeCambridgeEvaluation(evaluation);
-        if (!isCompleteCambridgeEvaluation(matrix)) {
-          return fail("Vui lòng đánh giá đủ ma trận Pattern và Free.");
-        }
-        const freestyleQuestions = questionList(evaluation.freestyleQuestions);
-        const freestyleCategory = text(evaluation.freestyleCategory);
-        if (freestyleQuestions.length !== 5) {
-          return fail("Mỗi lần kiểm tra cần đúng 5 câu Freestyle từ ngân hàng của level.");
-        }
-        if (freestyleQuestions.some((question) => question.length > 500)) {
-          return fail("Mỗi câu Freestyle không được dài quá 500 ký tự.");
-        }
-        if (action === "createLearningCheck") {
-          const [storedBank] = await db
-            .select()
-            .from(freestyleBanks)
-            .where(eq(freestyleBanks.programCode, programCode))
-            .limit(1);
-          const speakingProgramCode = programCode as SpeakingProgramCode;
-          const categories = storedBank
-            ? storedFreestyleCategories(storedBank.categoriesJson, defaultFreestyleBanks[speakingProgramCode])
-            : defaultFreestyleBanks[speakingProgramCode];
-          const selectedCategory = categories.find((category) => category.category === freestyleCategory);
-          if (!selectedCategory || freestyleCategoryQuestions(selectedCategory).length < 5) {
-            return fail(`Hãy chọn một chủ đề Freestyle có ít nhất 5 câu cho level ${program.label}.`);
-          }
-          const availableQuestions = new Set(freestyleCategoryQuestions(selectedCategory));
-          if (freestyleQuestions.some((question) => !availableQuestions.has(question))) {
-            return fail(`Năm câu Freestyle phải thuộc cùng chủ đề “${freestyleCategory}”. Vui lòng chọn lại.`);
-          }
-        }
-        delete evaluation.pronunciation;
-        evaluation.pattern = matrix.pattern;
-        evaluation.free = matrix.free;
-        if (freestyleCategory) evaluation.freestyleCategory = freestyleCategory;
-        evaluation.freestyleQuestions = freestyleQuestions;
-        const patternPercent = clampPercent(evaluation.patternPercent);
-        const freestylePercent = clampPercent(evaluation.freestylePercent);
-        evaluation.patternPercent = patternPercent;
-        evaluation.freestylePercent = freestylePercent;
-        componentPercentages = [patternPercent, freestylePercent];
-        hasRedflagComponent = patternPercent < 60 || freestylePercent < 60;
+      const groups = evaluationGroups(selectedUnits);
+      const provided = evaluation.unitEvaluations;
+      const perGroup = Array.isArray(provided) ? provided : null;
+      if (perGroup && (perGroup.length !== groups.length || perGroup.some((item) => !item || typeof item !== "object" || Array.isArray(item)))) {
+        return fail("Cần một bảng Evaluation Criteria cho mỗi Unit đã chọn.");
       }
-
+      if (!perGroup && groups.length > 1 && !existingCheck) return fail("Cần một bảng Evaluation Criteria cho mỗi Unit đã chọn.");
+      const previous = existingCheck ? (() => { try { return JSON.parse(existingCheck.evaluationJson) as Record<string, unknown>; } catch { return {}; } })() : {};
+      const previousUnits = Array.isArray(previous.unitEvaluations) ? previous.unitEvaluations as Record<string, unknown>[] : [];
+      const clampPercent = (value: unknown) => Math.min(100, Math.max(0, Number(value) || 0));
+      const validPercent = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+      const componentPercentages: number[] = [];
+      let hasRedflagComponent = false;
+      const normalized: Record<string, unknown>[] = [];
+      const [storedBank] = program.group === "cambridge" && action === "createLearningCheck"
+        ? await db.select().from(freestyleBanks).where(eq(freestyleBanks.programCode, programCode)).limit(1)
+        : [undefined];
+      const speakingProgramCode = programCode as SpeakingProgramCode;
+      const categories = storedBank
+        ? storedFreestyleCategories(storedBank.categoriesJson, defaultFreestyleBanks[speakingProgramCode])
+        : defaultFreestyleBanks[speakingProgramCode] || [];
+      for (const group of groups) {
+        const entry = perGroup
+          ? perGroup.find((value) => JSON.stringify(idList((value as Record<string, unknown>).unitNumbers).sort((a, b) => a - b)) === JSON.stringify([...group.unitNumbers].sort((a, b) => a - b))) as Record<string, unknown> | undefined
+          : evaluation;
+        if (!entry) return fail(`Thiếu bảng Evaluation Criteria của ${group.label}.`);
+        const fields: Record<string, unknown> = { unitNumbers: group.unitNumbers };
+        if (program.group === "baby") {
+          if (!validPercent(entry.spellingPercent) || !validPercent(entry.writingPercent)) return fail(`Vui lòng chấm Spelling và Writing của ${group.label} từ 0 đến 100.`);
+          const spellingPercent = clampPercent(entry.spellingPercent);
+          const writingPercent = clampPercent(entry.writingPercent);
+          Object.assign(fields, { spellingPercent, writingPercent });
+          componentPercentages.push(spellingPercent, writingPercent);
+          hasRedflagComponent ||= spellingPercent < 50 || writingPercent < 50;
+        } else if (program.group === "super") {
+          const vocabularyMax = Math.max(1, group.units.reduce((sum, unit) => sum + unit.vocabularyMax, 0));
+          if (typeof entry.vocabularyCorrect !== "number" || !Number.isInteger(entry.vocabularyCorrect) || entry.vocabularyCorrect < 0 || entry.vocabularyCorrect > vocabularyMax || !validPercent(entry.communicationPercent)) {
+            return fail(`Vui lòng chấm Vocabulary và Communication của ${group.label} trong giới hạn cho phép.`);
+          }
+          const pronunciation = text(entry.pronunciation);
+          if (!['clear', 'unclear'].includes(pronunciation)) return fail(`Vui lòng chọn Clear hoặc Unclear cho ${group.label}.`);
+          const vocabularyCorrect = entry.vocabularyCorrect;
+          const vocabularyPercent = vocabularyCorrect / vocabularyMax * 100;
+          const communicationPercent = clampPercent(entry.communicationPercent);
+          Object.assign(fields, { vocabularyCorrect, vocabularyMax, communicationPercent, pronunciation });
+          componentPercentages.push(vocabularyPercent, communicationPercent);
+          hasRedflagComponent ||= vocabularyPercent < 70 || communicationPercent < 60;
+        } else {
+          const matrix = normalizeCambridgeEvaluation(entry);
+          if (!isCompleteCambridgeEvaluation(matrix) || !validPercent(entry.patternPercent) || !validPercent(entry.freestylePercent)) return fail(`Vui lòng chấm đủ Pattern và Free của ${group.label}.`);
+          const questions = questionList(entry.freestyleQuestions);
+          const categoryName = text(entry.freestyleCategory);
+          if (!questions.length || questions.some((question) => question.length > 500)) return fail(`Câu hỏi Freestyle của ${group.label} không hợp lệ.`);
+          if (action === "createLearningCheck") {
+            const category = categories.find((item) => item.category === categoryName);
+            const expected = category ? freestyleCategoryQuestions(category) : [];
+            if (!expected.length || questions.length !== expected.length || questions.some((question) => !expected.includes(question))) {
+              return fail(`Hãy chọn toàn bộ câu hỏi trong cùng chủ đề Freestyle của ${group.label}.`);
+            }
+          } else {
+            const old = previousUnits.find((item) => JSON.stringify(item.unitNumbers) === JSON.stringify(group.unitNumbers)) || previous;
+            const oldQuestions = questionList(old.freestyleQuestions);
+            if (questions.length !== oldQuestions.length || questions.some((question) => !oldQuestions.includes(question)) || (text(old.freestyleCategory) && categoryName !== text(old.freestyleCategory))) {
+              return fail(`Không thể đổi câu hỏi Freestyle đã lưu của ${group.label}.`);
+            }
+          }
+          const patternPercent = clampPercent(entry.patternPercent);
+          const freestylePercent = clampPercent(entry.freestylePercent);
+          Object.assign(fields, { pattern: matrix.pattern, free: matrix.free, patternPercent, freestylePercent, freestyleCategory: categoryName, freestyleQuestions: questions });
+          componentPercentages.push(patternPercent, freestylePercent);
+          hasRedflagComponent ||= patternPercent < 60 || freestylePercent < 60;
+        }
+        normalized.push(fields);
+      }
       const overallPercent =
         componentPercentages.reduce((sum, value) => sum + value, 0) /
         componentPercentages.length;
@@ -730,7 +736,7 @@ export async function POST(request: Request) {
         unitNumber,
         unitLabel: selectedUnits.map((unit) => unit.unitLabel).join(", "),
         checkedAt,
-        evaluationJson: JSON.stringify({ ...evaluation, unitNumbers, ...(linkedQueueId ? { queueId: linkedQueueId } : {}) }),
+        evaluationJson: JSON.stringify({ unitEvaluations: normalized, unitNumbers, ...(linkedQueueId ? { queueId: linkedQueueId } : {}) }),
         overallScore,
         result,
         feedbackJson: JSON.stringify(feedback),
