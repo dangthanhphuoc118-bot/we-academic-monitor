@@ -53,10 +53,11 @@ import { AccountManager, LoginScreen, roleLabels, type CurrentUser } from "./aut
 
 import { TeacherObservationView, ObservationHistory } from "./teacher-observation";
 import { WeeklyTracking } from "./weekly-tracking";
+import { PlannedChecks, queueUnitNumbers } from "./planned-checks";
 import type { TeacherObservation } from "@/lib/observation";
 
 type TeacherLatest = { observedAt: string; result: string };
-type View = "weekly-tracking" | "overview" | "students" | "classes" | "teachers" | "teacher-review" | "curriculum" | "feedback-options" | "criteria" | "reports" | "accounts";
+type View = "weekly-tracking" | "overview" | "planned-checks" | "students" | "classes" | "teachers" | "teacher-review" | "curriculum" | "feedback-options" | "criteria" | "reports" | "accounts";
 type EntityKind = "class" | "student" | "teacher" | "criterion" | "levelOption" | "feedbackOption";
 type DataRow = Record<string, unknown>;
 
@@ -79,6 +80,7 @@ const today = () => {
 
 const navItems: { id: View; label: string; icon: typeof LayoutDashboard; section: "main" | "manage" | "report" }[] = [
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard, section: "main" },
+  { id: "planned-checks", label: "Kiểm tra dự kiến", icon: ClipboardCheck, section: "main" },
   { id: "teacher-review", label: "Đánh giá giáo viên", icon: UserCheck, section: "main" },
   { id: "students", label: "Học viên", icon: GraduationCap, section: "manage" },
   { id: "classes", label: "Lớp học", icon: Building2, section: "manage" },
@@ -182,7 +184,7 @@ export function AcademicDashboard() {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
-  const [activeStudentCheck, setActiveStudentCheck] = useState<{ studentId: number; editingCheck?: LearningCheck; initialDate?: string } | null>(null);
+  const [activeStudentCheck, setActiveStudentCheck] = useState<{ studentId: number; editingCheck?: LearningCheck; initialDate?: string; unitNumbers?: number[]; queueId?: number } | null>(null);
 
   const reload = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -330,6 +332,7 @@ export function AcademicDashboard() {
   const content = loading ? <LoadingView /> : loadError ? <LoadError message={loadError} retry={() => void reload()} /> : (
     <>
       {view === "overview" && <OverviewView data={data} atRisk={studentsAtRisk} unassessed={unassessed} checkedThisMonth={checkedThisMonth} latestTeacherMap={latestTeacherMap} setView={setView} onStudentCheck={goToStudentCheck} />}
+      {view === "planned-checks" && <PlannedChecks students={data.students} classes={data.classes} curriculum={data.curriculum} levelOptions={data.levelOptions} items={data.checkQueue} onReload={() => reload(true)} onOpen={(item) => { setSelectedClassId(item.classId ? String(item.classId) : ""); setSelectedStudentId(String(item.studentId)); setActiveStudentCheck({ studentId: item.studentId, initialDate: today(), unitNumbers: queueUnitNumbers(item), queueId: item.id }); }} />}
       {view === "students" && <StudentsView data={data} onAdd={() => setEditor({ kind: "student" })} onEdit={(item) => setEditor({ kind: "student", item: item as unknown as DataRow })} onDelete={(item) => setDeleting({ action: "deleteStudent", id: item.id, name: item.name })} onCheck={goToStudentCheck} />}
       {view === "classes" && <ClassesView data={data} onAdd={() => setEditor({ kind: "class" })} onEdit={(item) => setEditor({ kind: "class", item: item as unknown as DataRow })} onDelete={(item) => setDeleting({ action: "deleteClass", id: item.id, name: item.name })} onCheck={goToStudentCheck} />}
       {view === "teachers" && <TeachersView data={data} latestTeacherMap={latestTeacherMap} onAdd={() => setEditor({ kind: "teacher" })} onEdit={(item) => setEditor({ kind: "teacher", item: item as unknown as DataRow })} onDelete={(item) => setDeleting({ action: "deleteTeacher", id: item.id, name: item.name })} onReview={(item) => { setSelectedTeacherId(String(item.id)); setView("teacher-review"); }} />}
@@ -375,7 +378,7 @@ export function AcademicDashboard() {
             <DialogTitle>{activeStudentCheck?.editingCheck ? "Cập nhật kết quả kiểm tra" : "Kiểm tra học viên trực tiếp"}</DialogTitle>
             <DialogDescription>{data.students.find((item) => item.id === activeStudentCheck?.studentId)?.name || "Chọn nội dung và ghi nhận kết quả học tập."}</DialogDescription>
           </DialogHeader>
-          {activeStudentCheck ? <CurriculumStudentCheck key={`${activeStudentCheck.studentId}-${activeStudentCheck.editingCheck?.id ?? "new"}`} embedded initialCheckedAt={activeStudentCheck.initialDate} editingCheck={activeStudentCheck.editingCheck} classes={data.classes} students={data.students} curriculum={data.curriculum} freestyleBanks={data.freestyleBanks} levelOptions={data.levelOptions} feedbackOptions={data.feedbackOptions} selectedClassId={selectedClassId} setSelectedClassId={setSelectedClassId} selectedStudentId={selectedStudentId} setSelectedStudentId={setSelectedStudentId} onSaved={async () => { await reload(true); setActiveStudentCheck(null); }} openFeedbackOptions={() => setView("feedback-options")} canManage={false} /> : null}
+          {activeStudentCheck ? <CurriculumStudentCheck key={`${activeStudentCheck.studentId}-${activeStudentCheck.editingCheck?.id ?? "new"}-${activeStudentCheck.queueId ?? "direct"}`} embedded initialCheckedAt={activeStudentCheck.initialDate} initialUnitNumbers={activeStudentCheck.unitNumbers} queueId={activeStudentCheck.queueId} editingCheck={activeStudentCheck.editingCheck} classes={data.classes} students={data.students} curriculum={data.curriculum} freestyleBanks={data.freestyleBanks} levelOptions={data.levelOptions} feedbackOptions={data.feedbackOptions} selectedClassId={selectedClassId} setSelectedClassId={setSelectedClassId} selectedStudentId={selectedStudentId} setSelectedStudentId={setSelectedStudentId} onSaved={async () => { await reload(true); setActiveStudentCheck(null); }} openFeedbackOptions={() => setView("feedback-options")} canManage={false} /> : null}
         </DialogContent>
       </Dialog>
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
@@ -415,7 +418,8 @@ function evaluationCriteria(check: LearningCheck) {
   ];
   const matrix = normalizeCambridgeEvaluation(evaluation);
   return [
-    { label: "Pronunciation", value: choice(matrix.pronunciation) },
+    { label: "Pattern · Pronunciation", criterion: "Pronunciation", category: "Pattern" as const, value: choice(matrix.pattern.pronunciation) },
+    { label: "Free · Pronunciation", criterion: "Pronunciation", category: "Free" as const, value: choice(matrix.free.pronunciation) },
     { label: "Pattern · Điểm %", criterion: "Điểm %", category: "Pattern" as const, value: percent(evaluation.patternPercent) },
     { label: "Free · Điểm %", criterion: "Điểm %", category: "Free" as const, value: percent(evaluation.freestylePercent) },
     { label: "Pattern · One / Many", criterion: "One / Many", category: "Pattern" as const, value: choice(matrix.pattern.oneOrMany) },
@@ -431,7 +435,7 @@ function EvaluationCriteriaGrid({ criteria }: { criteria: EvaluationCriterion[] 
     return <div className="mt-2 grid gap-2 sm:grid-cols-2">{criteria.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label}</span><strong>{criterion.value}</strong></div>)}</div>;
   }
   const shared = criteria.filter((item) => !item.category);
-  const rows = ["Điểm %", "One / Many", "Am / Is / Are"];
+  const rows = ["Điểm %", "Pronunciation", "One / Many", "Am / Is / Are"];
   return <div className="mt-2 space-y-2">{shared.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label} · dùng chung</span><strong>{criterion.value}</strong></div>)}<div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div></div>;
 }
 

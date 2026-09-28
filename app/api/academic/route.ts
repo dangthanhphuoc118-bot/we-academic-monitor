@@ -212,6 +212,8 @@ export async function GET(request: Request) {
             className: classes.name,
             level: students.level,
             scheduledDate: studentCheckQueue.scheduledDate,
+            programCode: studentCheckQueue.programCode,
+            unitNumbersJson: studentCheckQueue.unitNumbersJson,
             status: studentCheckQueue.status,
             createdBy: studentCheckQueue.createdBy,
             completedAt: studentCheckQueue.completedAt,
@@ -262,7 +264,7 @@ export async function GET(request: Request) {
     const freestyleBankByProgram = new Map(
       freestyleBankRows.map((row) => [row.programCode, row])
     );
-    const cambridgePrograms = programs.filter((program) => program.group === "cambridge");
+    const speakingPrograms = programs.filter((program) => program.group === "cambridge" || program.group === "baby");
 
     return Response.json({
       classes: classRows.map((row) => {
@@ -289,7 +291,7 @@ export async function GET(request: Request) {
       teacherReviews: reviewRows,
       teacherObservations: observationRows,
       curriculum,
-      freestyleBanks: cambridgePrograms.map((program) => {
+      freestyleBanks: speakingPrograms.map((program) => {
         const stored = freestyleBankByProgram.get(program.code);
         const programCode = program.code as SpeakingProgramCode;
         return {
@@ -391,7 +393,7 @@ export async function POST(request: Request) {
 
     if (action === "updateFreestyleBank") {
       const programCode = text(body.programCode) as SpeakingProgramCode;
-      const program = programs.find((item) => item.code === programCode && item.group === "cambridge");
+      const program = programs.find((item) => item.code === programCode && (item.group === "cambridge" || item.group === "baby"));
       if (!program || !Array.isArray(body.categories)) {
         return fail("Ngân hàng Freestyle không hợp lệ.");
       }
@@ -501,7 +503,8 @@ export async function POST(request: Request) {
             and(
               eq(studentCheckQueue.classId, classId),
               eq(studentCheckQueue.scheduledDate, scheduledDate),
-              eq(studentCheckQueue.status, "pending")
+              eq(studentCheckQueue.status, "pending"),
+              eq(studentCheckQueue.unitNumbersJson, "[]")
             )
           ),
         db
@@ -531,6 +534,33 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, scheduled: studentIds.length }, { status: 201 });
     }
 
+    if (action === "upsertPlannedCheck") {
+      const studentId = id(body.studentId);
+      const scheduledDate = text(body.scheduledDate);
+      const unitNumbers = idList(body.unitNumbers).sort((a, b) => a - b);
+      if (!studentId || !validDate(scheduledDate) || !unitNumbers.length) {
+        return fail("Vui lòng chọn học viên, ngày dự kiến và ít nhất một Unit.");
+      }
+      const [student] = await db.select({ classId: students.classId, level: students.level })
+        .from(students).where(eq(students.id, studentId)).limit(1);
+      if (!student) return fail("Không tìm thấy học viên.", 404);
+      const [configured] = await db.select({ programCode: levelOptions.programCode })
+        .from(levelOptions).where(eq(levelOptions.label, student.level)).limit(1);
+      const program = programs.find((item) => item.code === configured?.programCode)
+        || programs.find((item) => item.label.toLowerCase() === student.level.toLowerCase());
+      if (!program || unitNumbers.some((number) => !curriculumDefaults.some((unit) => unit.programCode === program.code && unit.unitNumber === number))) {
+        return fail("Unit phải thuộc chương trình hiện tại của học viên.");
+      }
+      const [existing] = await db.select({ status: studentCheckQueue.status })
+        .from(studentCheckQueue).where(and(eq(studentCheckQueue.studentId, studentId), eq(studentCheckQueue.scheduledDate, scheduledDate))).limit(1);
+      if (existing?.status === "completed") return fail("Lịch này đã hoàn thành; hãy chọn ngày khác.", 409);
+      const values = { studentId, classId: student.classId, scheduledDate, programCode: program.code, unitNumbersJson: JSON.stringify(unitNumbers),
+        status: "pending", createdBy: actorName, completedAt: null, updatedAt: now() };
+      const [row] = await db.insert(studentCheckQueue).values(values)
+        .onConflictDoUpdate({ target: [studentCheckQueue.studentId, studentCheckQueue.scheduledDate], set: values }).returning();
+      return Response.json({ item: row }, { status: 201 });
+    }
+
     if (action === "removeStudentCheck") {
       const itemId = id(body.id);
       if (!itemId) return fail("Lịch kiểm tra không hợp lệ.");
@@ -543,6 +573,8 @@ export async function POST(request: Request) {
       const checkId = action === "updateLearningCheck" ? id(body.id) : null;
       const programCode = text(body.programCode);
       const unitNumber = id(body.unitNumber);
+      const unitNumbers = idList(body.unitNumbers ?? [body.unitNumber]).sort((a, b) => a - b);
+      const queueId = id(body.queueId);
       const checkedAt = text(body.checkedAt);
       const evaluation =
         body.evaluation && typeof body.evaluation === "object"
@@ -551,7 +583,7 @@ export async function POST(request: Request) {
       const feedback = Array.isArray(body.feedback)
         ? body.feedback.map(text).filter(Boolean).slice(0, 30)
         : [];
-      if (!studentId || !programCode || !unitNumber || !validDate(checkedAt)) {
+      if (!studentId || !programCode || !unitNumber || !unitNumbers.includes(unitNumber) || !validDate(checkedAt)) {
         return fail("Vui lòng chọn học viên, nội dung kiểm tra và ngày đánh giá.");
       }
       if (!isInStudentHistoryWindow(checkedAt)) {
@@ -559,9 +591,9 @@ export async function POST(request: Request) {
       }
       if (action === "updateLearningCheck" && !checkId) return fail("Bản đánh giá không hợp lệ.");
 
-      let existingCheck: { studentId: number; programLabel: string } | undefined;
+      let existingCheck: { studentId: number; programLabel: string; evaluationJson: string } | undefined;
       if (checkId) {
-        [existingCheck] = await db.select({ studentId: learningChecks.studentId, programLabel: learningChecks.programLabel }).from(learningChecks).where(eq(learningChecks.id, checkId)).limit(1);
+        [existingCheck] = await db.select({ studentId: learningChecks.studentId, programLabel: learningChecks.programLabel, evaluationJson: learningChecks.evaluationJson }).from(learningChecks).where(eq(learningChecks.id, checkId)).limit(1);
         if (!existingCheck) return fail("Không tìm thấy bản đánh giá cần cập nhật.", 404);
         if (existingCheck.studentId !== studentId) return fail("Không thể chuyển kết quả sang học viên khác.", 409);
       }
@@ -571,6 +603,20 @@ export async function POST(request: Request) {
         (unit) => unit.programCode === programCode && unit.unitNumber === unitNumber
       );
       if (!program || !defaultUnit) return fail("Chương trình hoặc unit không hợp lệ.");
+      const selectedDefaults = unitNumbers.map((number) => curriculumDefaults.find(
+        (item) => item.programCode === programCode && item.unitNumber === number
+      ));
+      if (selectedDefaults.some((item) => !item)) return fail("Danh sách Unit không hợp lệ.");
+
+      if (queueId && !checkId) {
+        const [queued] = await db.select({ studentId: studentCheckQueue.studentId, status: studentCheckQueue.status,
+          programCode: studentCheckQueue.programCode, unitNumbersJson: studentCheckQueue.unitNumbersJson }).from(studentCheckQueue)
+          .where(eq(studentCheckQueue.id, queueId)).limit(1);
+        if (!queued || queued.studentId !== studentId || queued.status !== "pending" || queued.programCode !== programCode ||
+          queued.unitNumbersJson !== JSON.stringify(unitNumbers)) {
+          return fail("Lịch kiểm tra đã thay đổi. Vui lòng mở lại từ danh sách dự kiến.", 409);
+        }
+      }
 
       const [student] = await db
         .select({ classId: students.classId, level: students.level })
@@ -579,23 +625,19 @@ export async function POST(request: Request) {
         .limit(1);
       if (!student) return fail("Không tìm thấy học viên.", 404);
 
-      const [override] = await db
-        .select()
-        .from(curriculumOverrides)
-        .where(
-          and(
-            eq(curriculumOverrides.programCode, programCode),
-            eq(curriculumOverrides.unitNumber, unitNumber)
-          )
-        )
-        .limit(1);
-      const unit = override
-        ? {
-            ...defaultUnit,
-            topic: override.topic,
-            vocabularyMax: override.vocabularyMax,
-          }
-        : defaultUnit;
+      if (queueId && !checkId) {
+        const [configured] = await db.select({ programCode: levelOptions.programCode })
+          .from(levelOptions).where(eq(levelOptions.label, student.level)).limit(1);
+        const currentProgram = configured?.programCode || programs.find((item) => item.label.toLowerCase() === student.level.toLowerCase())?.code;
+        if (currentProgram !== programCode) return fail("Trình độ học viên đã thay đổi. Vui lòng sửa lịch và chọn lại Unit.", 409);
+      }
+
+      const overrides = await db.select().from(curriculumOverrides).where(eq(curriculumOverrides.programCode, programCode));
+      const selectedUnits = selectedDefaults.map((source) => {
+        const unit = source!;
+        const override = overrides.find((item) => item.unitNumber === unit.unitNumber);
+        return override ? { ...unit, topic: override.topic, vocabularyMax: override.vocabularyMax } : unit;
+      });
 
       const clampPercent = (value: unknown) =>
         Math.min(100, Math.max(0, Number(value) || 0));
@@ -608,7 +650,7 @@ export async function POST(request: Request) {
         componentPercentages = [spellingPercent, writingPercent];
         hasRedflagComponent = spellingPercent < 50 || writingPercent < 50;
       } else if (program.group === "super") {
-        const vocabularyMax = Math.max(1, unit.vocabularyMax || 1);
+        const vocabularyMax = Math.max(1, selectedUnits.reduce((sum, unit) => sum + unit.vocabularyMax, 0));
         const vocabularyCorrect = Math.min(
           vocabularyMax,
           Math.max(0, Number(evaluation.vocabularyCorrect) || 0)
@@ -653,7 +695,7 @@ export async function POST(request: Request) {
             return fail(`Năm câu Freestyle phải thuộc cùng chủ đề “${freestyleCategory}”. Vui lòng chọn lại.`);
           }
         }
-        evaluation.pronunciation = matrix.pronunciation;
+        delete evaluation.pronunciation;
         evaluation.pattern = matrix.pattern;
         evaluation.free = matrix.free;
         if (freestyleCategory) evaluation.freestyleCategory = freestyleCategory;
@@ -676,13 +718,19 @@ export async function POST(request: Request) {
           ? "Good"
           : "Average";
 
+      let linkedQueueId = queueId;
+      if (existingCheck) {
+        try { linkedQueueId = id((JSON.parse(existingCheck.evaluationJson) as Record<string, unknown>).queueId); }
+        catch { linkedQueueId = null; }
+      }
+
       const checkValues = {
         programCode,
         programLabel: existingCheck?.programLabel || student.level || program.label,
         unitNumber,
-        unitLabel: defaultUnit.unitLabel,
+        unitLabel: selectedUnits.map((unit) => unit.unitLabel).join(", "),
         checkedAt,
-        evaluationJson: JSON.stringify(evaluation),
+        evaluationJson: JSON.stringify({ ...evaluation, unitNumbers, ...(linkedQueueId ? { queueId: linkedQueueId } : {}) }),
         overallScore,
         result,
         feedbackJson: JSON.stringify(feedback),
@@ -704,22 +752,24 @@ export async function POST(request: Request) {
           ...checkValues,
         })
         .returning();
-      await db
-        .update(studentCheckQueue)
+      await db.update(studentCheckQueue)
         .set({ status: "completed", completedAt: now(), updatedAt: now() })
-        .where(
-          and(
-            eq(studentCheckQueue.studentId, studentId),
-            eq(studentCheckQueue.scheduledDate, checkedAt)
-          )
-        );
+        .where(queueId ? and(eq(studentCheckQueue.id, queueId), eq(studentCheckQueue.studentId, studentId), eq(studentCheckQueue.status, "pending"))
+          : and(eq(studentCheckQueue.studentId, studentId), eq(studentCheckQueue.scheduledDate, checkedAt), eq(studentCheckQueue.unitNumbersJson, "[]")));
       return Response.json({ item: row }, { status: 201 });
     }
 
     if (action === "deleteLearningCheck") {
       const itemId = id(body.id);
       if (!itemId) return fail("Bản đánh giá không hợp lệ.");
+      const [existing] = await db.select({ evaluationJson: learningChecks.evaluationJson }).from(learningChecks).where(eq(learningChecks.id, itemId)).limit(1);
       await db.delete(learningChecks).where(eq(learningChecks.id, itemId));
+      if (existing) {
+        try {
+          const linkedQueueId = id((JSON.parse(existing.evaluationJson) as Record<string, unknown>).queueId);
+          if (linkedQueueId) await db.update(studentCheckQueue).set({ status: "pending", completedAt: null, updatedAt: now() }).where(eq(studentCheckQueue.id, linkedQueueId));
+        } catch { /* A legacy check may not contain queue metadata. */ }
+      }
       return Response.json({ ok: true });
     }
 

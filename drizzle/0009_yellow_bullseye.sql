@@ -1,0 +1,1 @@
+ALTER TABLE `student_check_queue` ADD `unit_numbers_json` text DEFAULT '[]' NOT NULL;

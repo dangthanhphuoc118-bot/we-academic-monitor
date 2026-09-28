@@ -310,6 +310,8 @@ export const studentCheckQueue = sqliteTable(
       onDelete: "set null",
     }),
     scheduledDate: text("scheduled_date").notNull(),
+    programCode: text("program_code").notNull().default(""),
+    unitNumbersJson: text("unit_numbers_json").notNull().default("[]"),
     status: text("status").notNull().default("pending"),
     createdBy: text("created_by").notNull().default(""),
     completedAt: text("completed_at"),

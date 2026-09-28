@@ -1,0 +1,1 @@
+ALTER TABLE `student_check_queue` ADD `program_code` text DEFAULT '' NOT NULL;
