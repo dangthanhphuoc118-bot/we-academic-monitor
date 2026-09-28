@@ -79,7 +79,7 @@ export function PlannedChecks({ students, classes, curriculum, levelOptions, ite
     const code = item.programCode || levelOptions.find((row) => row.label.toLowerCase() === student?.level.toLowerCase())?.programCode
       || programs.find((row) => row.label.toLowerCase() === student?.level.toLowerCase())?.code;
     const numbers = queueUnitNumbers(item);
-    return numbers.length ? numbers.map((number) => curriculum.find((unit) => unit.programCode === code && unit.unitNumber === number)?.unitLabel || `Unit ${number}`).join(", ") : "Chưa chọn Unit";
+    return numbers.length ? curriculum.filter((unit) => unit.programCode === code && numbers.includes(unit.unitNumber)).map((unit) => unit.unitLabel).join(", ") : "Chưa chọn Unit";
   };
   const currentProgram = (item: StudentCheckQueueItem) => {
     const level = students.find((row) => row.id === item.studentId)?.level || "";
@@ -88,7 +88,7 @@ export function PlannedChecks({ students, classes, curriculum, levelOptions, ite
   };
 
   return <div className="space-y-6">
-    <div><p className="text-xs font-bold uppercase tracking-widest text-[#2f6f9f]">Academic Leader</p><h1 className="mt-1 text-3xl font-bold">Danh sách kiểm tra dự kiến</h1><p className="mt-2 text-sm text-muted-foreground">Chuẩn bị học viên và nhiều Unit trước giờ kiểm tra. Mỗi học viên có một lịch cho mỗi ngày; kết quả được lưu chung cho các Unit đã chọn.</p></div>
+    <div><p className="text-xs font-bold uppercase tracking-widest text-[#2f6f9f]">Academic Leader</p><h1 className="mt-1 text-3xl font-bold">Danh sách kiểm tra dự kiến</h1><p className="mt-2 text-sm text-muted-foreground">Chuẩn bị học viên và nhiều Unit trước giờ kiểm tra. Mỗi học viên có một lịch cho mỗi ngày; mỗi Unit được chấm trong một bảng riêng.</p></div>
     <Card><CardHeader><CardTitle>{editingId ? "Sửa lịch kiểm tra" : "Thêm học viên vào danh sách"}</CardTitle></CardHeader><CardContent className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <div><Label htmlFor="planned-class">Lớp học</Label><select id="planned-class" className="mt-2 h-10 w-full rounded-lg border bg-white px-3 text-sm" value={classId} disabled={Boolean(editingId)} onChange={(event) => { setClassId(event.target.value); setStudentId(""); setSelectedUnits([]); }}><option value="">Tất cả lớp</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>

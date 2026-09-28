@@ -606,7 +606,7 @@ export async function POST(request: Request) {
       if (!program || !defaultUnit) return fail("Chương trình hoặc unit không hợp lệ.");
       const selectedDefaults = unitNumbers.map((number) => curriculumDefaults.find(
         (item) => item.programCode === programCode && item.unitNumber === number
-      ));
+      )).sort((left, right) => curriculumDefaults.indexOf(left!) - curriculumDefaults.indexOf(right!));
       if (selectedDefaults.some((item) => !item)) return fail("Danh sách Unit không hợp lệ.");
 
       if (queueId && !checkId) {
