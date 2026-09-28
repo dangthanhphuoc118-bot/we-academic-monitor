@@ -4,8 +4,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { build } from "esbuild";
 import { drizzle } from "drizzle-orm/d1";
-import { addDays, build48Weeks, mondayOf, validDate, vietnamToday } from "../lib/weekly-history.ts";
-import { studentHistoryWindow } from "../lib/history-retention.ts";
+import { addDays, build12Weeks, build48Weeks, mondayOf, validDate, vietnamToday } from "../lib/weekly-history.ts";
+import { studentHistoryWindow, studentTrackingWindow } from "../lib/history-retention.ts";
 import { emptyObservation, observationGroups, validateObservationItems } from "../lib/observation.ts";
 
 test("48 weeks use Vietnam dates, Monday boundaries, leap days and retain multiple checks", () => {
@@ -20,6 +20,7 @@ test("48 weeks use Vietnam dates, Monday boundaries, leap days and retain multip
     { id: 5, checkedAt: "2026-09-13" }, { id: 6, checkedAt: "2027-08-16" },
   ], "2026-10-05");
   assert.equal(weeks.length, 48);
+  assert.equal(build12Weeks("2026-09-18", [], "2026-10-05").length, 12);
   assert.deepEqual(weeks[0].records.map((row) => row.id), [3, 2, 1]);
   assert.equal(weeks[1].records[0].id, 4);
   assert.equal(weeks[2].state, "missed");
@@ -155,12 +156,14 @@ test("Rolling history keeps 48 weeks, loads more than 300 records and prunes wee
   const response = await history.GET(req("/api/student-history?studentId=1"));
   assert.equal(response.status, 200, await response.clone().text());
   const rows = await response.json();
-  assert.equal(rows.startDate, window.startDate);
-  assert.equal(rows.endDate, window.endDate);
+  const tracking = studentTrackingWindow(vietnamToday());
+  assert.equal(rows.startDate, tracking.startDate);
+  assert.equal(rows.endDate, tracking.endDate);
   assert.equal(rows.currentWeekStart, window.currentWeekStart);
   assert.equal(rows.deletedBefore, window.startDate);
   assert.equal(Object.hasOwn(rows, "savedStartDate"), false);
-  assert.equal(rows.learningChecks.length, 310);
+  assert.equal(rows.learningChecks.length, sqlite.prepare("SELECT count(*) AS n FROM learning_checks WHERE student_id=1 AND checked_at >= ? AND checked_at < ?").get(tracking.startDate, tracking.endExclusive).n);
+  assert.equal(sqlite.prepare("SELECT count(*) AS n FROM learning_checks WHERE student_id=1 AND checked_at < ?").get(tracking.startDate).n > 0, true);
   assert.equal(rows.legacy.length, 1);
   assert.equal(rows.legacy[0].summary, "Older notes");
   assert.ok(rows.learningChecks.every((row) => row.studentId === 1 && row.studentName === "Student One"));
@@ -191,7 +194,7 @@ test("Academic payload includes observations and does not overwrite custom curri
   const blockedQuestions = ["Mover A?", "Mover B?", "Mover C?", "Mover D?", "Mover E?"];
   const blocked = await academic.POST(req("/api/academic", "academic_leader", { action: "createLearningCheck", studentId: 2, programCode: "MOVERS", unitNumber: 1, checkedAt: "2026-09-18", notes: "", feedback: [], evaluation: { patternPercent: 90, freestylePercent: 90, pronunciation: "clear", pattern: { oneOrMany: "correct", amIsAre: "correct" }, free: { oneOrMany: "correct", amIsAre: "correct" }, freestyleCategory: "General", freestyleQuestions: blockedQuestions } }));
   assert.equal(blocked.status, 400);
-  assert.match((await blocked.json()).error, /ít nhất 5 câu/);
+  assert.match((await blocked.json()).error, /toàn bộ câu hỏi/);
 
   const customQuestions = ["Flyers question A?", "Flyers question B?", "Flyers question C?", "Flyers question D?", "Flyers question E?"];
   const bankSaved = await academic.POST(req("/api/academic", "academic_manager", { action: "updateFreestyleBank", programCode: "FLYERS", categories: [{ category: "General", yesNoQuestions: customQuestions.slice(0, 2), whQuestions: customQuestions.slice(2) }] }));
@@ -240,13 +243,13 @@ test("Saving and editing a student check updates its rolling history without dup
   const { item } = await created.json();
   assert.equal(item.result, "Good");
   const savedEvaluation = JSON.parse(sqlite.prepare("SELECT evaluation_json AS evaluationJson FROM learning_checks WHERE id=?").get(item.id).evaluationJson);
-  assert.deepEqual(savedEvaluation.pattern, { ...body.evaluation.pattern, pronunciation: "clear" });
-  assert.deepEqual(savedEvaluation.free, { ...body.evaluation.free, pronunciation: "clear" });
+  assert.deepEqual(savedEvaluation.unitEvaluations[0].pattern, { ...body.evaluation.pattern, pronunciation: "clear" });
+  assert.deepEqual(savedEvaluation.unitEvaluations[0].free, { ...body.evaluation.free, pronunciation: "clear" });
   assert.equal(savedEvaluation.pronunciation, undefined);
   assert.deepEqual(savedEvaluation.unitNumbers, [2]);
-  assert.equal(savedEvaluation.freestyleCategory, "General");
-  assert.equal(savedEvaluation.patternPercent, 90);
-  assert.equal(savedEvaluation.freestylePercent, 80);
+  assert.equal(savedEvaluation.unitEvaluations[0].freestyleCategory, "General");
+  assert.equal(savedEvaluation.unitEvaluations[0].patternPercent, 90);
+  assert.equal(savedEvaluation.unitEvaluations[0].freestylePercent, 80);
   const countBefore = sqlite.prepare("SELECT count(*) AS n FROM learning_checks").get().n;
   const updated = await academic.POST(req("/api/academic", "academic_manager", { ...body, action: "updateLearningCheck", id: item.id, checkedAt: "2026-09-13", notes: "Updated feedback" }));
   assert.equal(updated.status, 200, await updated.clone().text());
@@ -255,7 +258,7 @@ test("Saving and editing a student check updates its rolling history without dup
   const check = result.learningChecks.find((row) => row.id === item.id);
   assert.equal(check.notes, "Updated feedback");
   assert.equal(check.teacherName, "Test academic_leader");
-  assert.equal(build48Weeks(result.startDate, [check]).find((week) => week.records.some((record) => record.id === item.id)).records[0].id, item.id);
+  assert.equal(build12Weeks(result.startDate, [check]).find((week) => week.records.some((record) => record.id === item.id)).records[0].id, item.id);
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, checkedAt: "2026-02-30" }))).status, 400);
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, checkedAt: "2025-10-19" }))).status, 400);
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, evaluation: { ...body.evaluation, freestyleQuestions: ["Only one?"] } }))).status, 400);
@@ -277,20 +280,54 @@ test("A planned check opens multiple units and completes by queue id even on a d
   const questions = ["Flyers question A?", "Flyers question B?", "Flyers question C?", "Flyers question D?", "Flyers question E?"];
   const created = await academic.POST(req("/api/academic", "academic_leader", {
     action: "createLearningCheck", queueId: planned.id, studentId: 1, programCode: "FLYERS", unitNumber: 1,
-    unitNumbers: [1, 2], checkedAt: "2026-09-19", notes: "Two units", evaluation: {
-      patternPercent: 82, freestylePercent: 78, pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" },
+    unitNumbers: [1, 2], checkedAt: "2026-09-19", notes: "Two units", evaluation: { unitEvaluations: [1, 2].map((number) => ({
+      unitNumbers: [number], patternPercent: number === 1 ? 82 : 95, freestylePercent: 78,
+      pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" },
       free: { pronunciation: "unclear", oneOrMany: "incorrect", amIsAre: "correct" },
       freestyleCategory: "General", freestyleQuestions: questions,
-    },
+    })) },
   }));
   assert.equal(created.status, 201, await created.clone().text());
   const { item: check } = await created.json();
   assert.equal(check.unitLabel, "Unit 1, Unit 2");
   assert.deepEqual(JSON.parse(check.evaluationJson).unitNumbers, [1, 2]);
-  assert.equal(JSON.parse(check.evaluationJson).free.pronunciation, "unclear");
+  assert.equal(JSON.parse(check.evaluationJson).unitEvaluations[1].free.pronunciation, "unclear");
+  assert.deepEqual(JSON.parse(check.evaluationJson).unitEvaluations.map((row) => row.patternPercent), [82, 95]);
   assert.equal(sqlite.prepare("SELECT status FROM student_check_queue WHERE id=?").get(planned.id).status, "completed");
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { action: "deleteLearningCheck", id: check.id }))).status, 200);
   assert.equal(sqlite.prepare("SELECT status FROM student_check_queue WHERE id=?").get(planned.id).status, "pending");
+});
+
+test("Separate Super Kids scores and grouped Baby Stars All reviews are validated", async () => {
+  sqlite.exec("INSERT INTO students(id,name,level,class_id) VALUES (3,'Super Learner','Super Kids 1',1),(4,'Baby Learner','Baby Stars',1)");
+  const base = { action: "createLearningCheck", checkedAt: "2026-09-18", feedback: [], notes: "" };
+  const superScores = [{ unitNumbers: [1], vocabularyCorrect: 8, communicationPercent: 90, pronunciation: "clear" }, { unitNumbers: [2], vocabularyCorrect: 2, communicationPercent: 90, pronunciation: "unclear" }];
+  const superBody = { ...base, studentId: 3, programCode: "SUPER_KIDS_1", unitNumber: 1, unitNumbers: [1, 2], evaluation: { unitEvaluations: superScores } };
+  assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...superBody, evaluation: { unitEvaluations: [superScores[0]] } }))).status, 400);
+  const created = await academic.POST(req("/api/academic", "academic_leader", superBody));
+  assert.equal(created.status, 201, await created.clone().text());
+  const superCheck = (await created.json()).item;
+  assert.equal(superCheck.result, "Redflag");
+  assert.deepEqual(JSON.parse(superCheck.evaluationJson).unitEvaluations.map((row) => row.vocabularyCorrect), [8, 2]);
+  const babyBody = { ...base, studentId: 4, programCode: "BABY_STARS", unitNumber: 26, unitNumbers: [26, 27, 28], evaluation: { unitEvaluations: [{ unitNumbers: [26, 27, 28], spellingPercent: 95, writingPercent: 85 }] } };
+  const baby = await academic.POST(req("/api/academic", "academic_leader", babyBody));
+  assert.equal(baby.status, 201, await baby.clone().text());
+  assert.equal(JSON.parse((await baby.json()).item.evaluationJson).unitEvaluations.length, 1);
+  assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...babyBody, evaluation: { unitEvaluations: [{ unitNumbers: [26], spellingPercent: 90, writingPercent: 90 }] } }))).status, 400);
+});
+
+test("Cambridge saves every question in the selected topic", async () => {
+  sqlite.exec("INSERT INTO students(id,name,level,class_id) VALUES (5,'Starters Learner','Starters',1)");
+  const category = (await (await academic.GET(req("/api/academic"))).json()).freestyleBanks.find((bank) => bank.programCode === "STARTERS").categories[0];
+  const questions = [...category.yesNoQuestions, ...category.whQuestions];
+  assert.ok(questions.length > 5);
+  const score = { patternPercent: 88, freestylePercent: 92, pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" }, free: { pronunciation: "unclear", oneOrMany: "correct", amIsAre: "correct" }, freestyleCategory: category.category, freestyleQuestions: questions };
+  const body = { action: "createLearningCheck", studentId: 5, programCode: "STARTERS", unitNumber: 1, checkedAt: "2026-09-18", evaluation: { unitEvaluations: [{ unitNumbers: [1], ...score }] } };
+  const created = await academic.POST(req("/api/academic", "academic_leader", body));
+  assert.equal(created.status, 201, await created.clone().text());
+  assert.deepEqual(JSON.parse((await created.json()).item.evaluationJson).unitEvaluations[0].freestyleQuestions, questions);
+  const partial = await academic.POST(req("/api/academic", "academic_leader", { ...body, evaluation: { unitEvaluations: [{ unitNumbers: [1], ...score, freestyleQuestions: questions.slice(0, 5) }] } }));
+  assert.equal(partial.status, 400);
 });
 
 test("Observation snapshot remains readable and editable when teacher/class are removed", async () => {

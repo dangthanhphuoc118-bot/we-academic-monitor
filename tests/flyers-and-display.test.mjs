@@ -110,7 +110,8 @@ test("Detailed criteria and grade classification are retained", () => {
   assert.ok(form.includes('id="free-percent"'));
   assert.ok(form.includes('label="Pattern pronunciation"'));
   assert.ok(form.includes('label="Free pronunciation"'));
-  assert.ok(form.includes("sampleFreestyleQuestionsFromCategory"));
+  assert.ok(form.includes("freestyleCategoryQuestions(category)"));
+  assert.ok(!form.includes("Đổi 5 câu"));
 });
 
 test("Cambridge pronunciation is independent and legacy shared values fill both columns", () => {
@@ -172,4 +173,14 @@ test("Class editor exposes multiple teacher assignments", () => {
   assert.ok(dashboard.includes("selectedTeacherIds"));
   assert.ok(dashboard.includes('type="checkbox"'));
   assert.ok(dashboard.includes('item.teacherNames.join(" · ")'));
+});
+
+test("Each Super Kids level has a cumulative All reviews chapter after its units", () => {
+  for (let level = 1; level <= 8; level++) {
+    const units = curriculumDefaults.filter((unit) => unit.programCode === `SUPER_KIDS_${level}`);
+    const review = units.at(-1);
+    assert.equal(review.unitLabel, "All reviews");
+    assert.equal(review.unitNumber, units.at(-2).unitNumber + 1);
+    assert.equal(review.vocabularyMax, units.slice(0, -1).reduce((sum, unit) => sum + unit.vocabularyMax, 0));
+  }
 });

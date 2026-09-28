@@ -257,16 +257,32 @@ const flyers = units("FLYERS", [
   { unitNumber: 12, topic: "Past and Future", content: "Vocabulary and communication check", vocabulary: "ADJ: Enough - Ready - Worried\nNOUN: Air - City - Calendar - Camel - Desert - Dinosaur - Eagle - Environment - Forest - Future - Land - Mountain - Nest - Ocean - Octopus - Past - Planet - Pond - Pyramid - Racing bike - Rocket - Shell - Skyscraper - Space - Spaceship - Stadium - Steam - Stone - Stream - Tree\nVERB: Guess - Hope - Ski\nADV: Suddenly\nPREPOSITION: ", grammar: "Pattern and freestyle communication", vocabularyMax: 23, writingRef: "" },
 ]);
 
+function superWithAllReviews(source: CurriculumUnit[]): CurriculumUnit[] {
+  const last = source[source.length - 1];
+  return [...source, {
+    ...last,
+    unitNumber: last.unitNumber + 1,
+    unitLabel: "All reviews",
+    topic: "All reviews",
+    content: `Ôn tập tổng hợp ${source.map((unit) => unit.unitLabel).join(", ")}`,
+    vocabulary: source.map((unit) => `${unit.unitLabel}: ${unit.vocabulary}`).join("\n"),
+    grammar: source.map((unit) => `${unit.unitLabel}: ${unit.grammar}`).join("\n"),
+    vocabularyMax: source.reduce((sum, unit) => sum + unit.vocabularyMax, 0),
+    dayStart: last.dayEnd + 1,
+    dayEnd: last.dayEnd + 1,
+  }];
+}
+
 export const curriculumDefaults: CurriculumUnit[] = [
   ...babyStars,
-  ...superKids1,
-  ...superKids2,
-  ...superKids3,
-  ...superKids4,
-  ...superKids5,
-  ...superKids6,
-  ...superKids7,
-  ...superKids8,
+  ...superWithAllReviews(superKids1),
+  ...superWithAllReviews(superKids2),
+  ...superWithAllReviews(superKids3),
+  ...superWithAllReviews(superKids4),
+  ...superWithAllReviews(superKids5),
+  ...superWithAllReviews(superKids6),
+  ...superWithAllReviews(superKids7),
+  ...superWithAllReviews(superKids8),
   ...starters,
   ...movers,
   ...flyers,

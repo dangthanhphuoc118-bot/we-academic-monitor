@@ -23,9 +23,9 @@ export function mondayOf(value: string) {
   return addDays(value, -((weekday + 6) % 7));
 }
 
-export function build48Weeks<T extends { id: number; checkedAt: string; createdAt?: string }>(start: string, records: T[], today = vietnamToday()) {
+export function buildWeeks<T extends { id: number; checkedAt: string; createdAt?: string }>(start: string, records: T[], today = vietnamToday(), count = 12) {
   const first = mondayOf(start);
-  return Array.from({ length: 48 }, (_, index) => {
+  return Array.from({ length: count }, (_, index) => {
     const startDate = addDays(first, index * 7);
     const endDate = addDays(startDate, 6);
     const items = records.filter((record) => record.checkedAt >= startDate && record.checkedAt <= endDate)
@@ -33,3 +33,6 @@ export function build48Weeks<T extends { id: number; checkedAt: string; createdA
     return { number: index + 1, startDate, endDate, records: items, state: items.length ? "checked" : startDate > today ? "future" : endDate < today ? "missed" : "current" };
   });
 }
+
+export const build12Weeks = <T extends { id: number; checkedAt: string; createdAt?: string }>(start: string, records: T[], today = vietnamToday()) => buildWeeks(start, records, today, 12);
+export const build48Weeks = <T extends { id: number; checkedAt: string; createdAt?: string }>(start: string, records: T[], today = vietnamToday()) => buildWeeks(start, records, today, 48);

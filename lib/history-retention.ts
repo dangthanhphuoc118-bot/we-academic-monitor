@@ -4,10 +4,18 @@ import { learningChecks, studentAssessments, studentCheckQueue } from "../db/sch
 import { addDays, mondayOf, validDate, vietnamToday } from "./weekly-history";
 
 export const STUDENT_HISTORY_WEEKS = 48;
+export const STUDENT_TRACKING_WEEKS = 12;
 
 export function studentHistoryWindow(today = vietnamToday()) {
   const currentWeekStart = mondayOf(today);
   const startDate = addDays(currentWeekStart, -(STUDENT_HISTORY_WEEKS - 1) * 7);
+  const endExclusive = addDays(currentWeekStart, 7);
+  return { startDate, endDate: addDays(endExclusive, -1), endExclusive, currentWeekStart };
+}
+
+export function studentTrackingWindow(today = vietnamToday()) {
+  const currentWeekStart = mondayOf(today);
+  const startDate = addDays(currentWeekStart, -(STUDENT_TRACKING_WEEKS - 1) * 7);
   const endExclusive = addDays(currentWeekStart, 7);
   return { startDate, endDate: addDays(endExclusive, -1), endExclusive, currentWeekStart };
 }
