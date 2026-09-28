@@ -2,12 +2,12 @@ export type CambridgePronunciation = "clear" | "unclear";
 export type CambridgeBinary = "correct" | "incorrect";
 
 export type CambridgeColumnEvaluation = {
+  pronunciation: CambridgePronunciation | "";
   oneOrMany: CambridgeBinary | "";
   amIsAre: CambridgeBinary | "";
 };
 
 export type CambridgeEvaluationMatrix = {
-  pronunciation: CambridgePronunciation | "";
   pattern: CambridgeColumnEvaluation;
   free: CambridgeColumnEvaluation;
 };
@@ -29,12 +29,13 @@ export function normalizeCambridgeEvaluation(value: Record<string, unknown>): Ca
   const legacyOneOrMany = binary(value.oneOrMany);
   const legacyAmIsAre = binary(value.amIsAre);
   return {
-    pronunciation: legacyPronunciation || pronunciation(pattern.pronunciation) || pronunciation(free.pronunciation),
     pattern: {
+      pronunciation: pronunciation(pattern.pronunciation) || legacyPronunciation,
       oneOrMany: binary(pattern.oneOrMany) || legacyOneOrMany,
       amIsAre: binary(pattern.amIsAre) || legacyAmIsAre,
     },
     free: {
+      pronunciation: pronunciation(free.pronunciation) || legacyPronunciation,
       oneOrMany: binary(free.oneOrMany) || legacyOneOrMany,
       amIsAre: binary(free.amIsAre) || legacyAmIsAre,
     },
@@ -42,7 +43,7 @@ export function normalizeCambridgeEvaluation(value: Record<string, unknown>): Ca
 }
 
 export function isCompleteCambridgeEvaluation(value: CambridgeEvaluationMatrix) {
-  return Boolean(value.pronunciation) && [value.pattern, value.free].every((column) =>
-    Boolean(column.oneOrMany && column.amIsAre)
+  return [value.pattern, value.free].every((column) =>
+    Boolean(column.pronunciation && column.oneOrMany && column.amIsAre)
   );
 }

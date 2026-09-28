@@ -10,12 +10,14 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
 - Phiếu Starters/Movers/Flyers chọn một chủ đề Freestyle rồi lấy ngẫu nhiên đúng 5 câu trong chủ đề đó, hiển thị theo hai cột YES/NO và WH QUESTIONS.
-- Phần chấm Cambridge có điểm % riêng cho Pattern và Free; Pronunciation dùng chung, còn One/Many và Am/Is/Are được đánh giá theo từng cột.
+- Phần chấm Cambridge có điểm % và Pronunciation Clear/Unclear riêng cho Pattern và Free; One/Many và Am/Is/Are cũng được đánh giá theo từng cột.
+- Baby Stars có sẵn 8 câu Freestyle chung cho level, hiển thị ngay trong phiếu kiểm tra và có thể chỉnh sửa ở Khung chương trình.
+- Trang Kiểm tra dự kiến cho AL/Manager/Admin thêm học viên, ngày và nhiều Unit, sửa/xóa mục chờ và mở trực tiếp phiếu kiểm tra. Một phiếu ghi một kết quả tổng hợp cho các Unit đã chọn.
 - Mở phiếu kiểm tra trực tiếp từ từng học viên trong danh sách lớp.
 - Lọc lớp theo ngày học thực tế với múi giờ Việt Nam hoặc xem tất cả lớp; lớp không còn gắn cứng với một trình độ.
 - Chỉnh sửa từng Unit/Day và khôi phục nội dung gốc.
 - Khung Movers và Flyers hiển thị riêng 5 nhóm ADJ, NOUN, VERB, ADV và PREPOSITION.
-- Mỗi level Starters, Movers và Flyers có một ngân hàng Freestyle chung cho toàn bộ Unit; có thể tự tạo nhóm, sửa từng câu và phiếu kiểm tra chọn ngẫu nhiên đúng 5 câu từ level của học viên.
+- Baby Stars, Starters, Movers và Flyers đều có ngân hàng Freestyle chung cho toàn bộ Unit; Cambridge chọn 5 câu trong một chủ đề, Baby Stars hiển thị bộ câu hỏi tham khảo.
 - Starters có sẵn 46 câu theo 7 chủ đề từ tài liệu mới; Movers và Flyers để trống để nhập trực tiếp trong Khung chương trình.
 - Tự quản lý mẫu nhận xét để giáo viên tick nhanh khi đánh giá.
 - Đánh giá giáo viên theo Classroom Observation: 7 tiêu chí Academic/Attitude, ô chọn và ghi chú; lưu, xem, sửa/xóa từng phiếu.
@@ -40,7 +42,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 ## Hướng dẫn nhanh
 
-**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật ngày 24/09/2026](HUONG-DAN-CAP-NHAT-24-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
+**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật ngày 28/09/2026](HUONG-DAN-CAP-NHAT-28-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
 
 Toàn bộ hướng dẫn từng bước nằm trong file [HUONG-DAN-SETUP.md](HUONG-DAN-SETUP.md).
 
@@ -67,6 +69,7 @@ npm run deploy
 - Migration `0006_awesome_turbo.sql` chỉ thêm cột ngân hàng Freestyle theo Unit; giữ nguyên mọi dữ liệu cũ.
 - Migration `0007_unique_polaris.sql` tạo bảng phân công nhiều giáo viên và tự chuyển giáo viên đang gắn với từng lớp; không làm mất phân công cũ.
 - Migration `0008_closed_jack_murdock.sql` tạo ngân hàng Freestyle theo level và chủ động xóa nội dung Freestyle cũ theo từng Unit của Starters, Movers và Flyers. Migration không xóa 5 câu đã lưu trong lịch sử kết quả kiểm tra.
+- Migration `0009_yellow_bullseye.sql` và `0010_powerful_vindicator.sql` chỉ thêm cột danh sách Unit và mã chương trình vào lịch kiểm tra; các lịch và kết quả cũ vẫn được giữ nguyên.
 - Việc xóa dữ liệu học viên ngoài 48 tuần không nằm trong migration. Nó chạy khi người dùng đã đăng nhập tải dashboard hoặc tab Theo dõi 48 tuần. Vì vậy phải sao lưu D1 trước khi triển khai bản này nếu cần giữ lịch sử lâu hơn.
 - Trước mỗi thay đổi lớn, xuất bản sao D1 theo hướng dẫn trong `HUONG-DAN-SETUP.md`.
 

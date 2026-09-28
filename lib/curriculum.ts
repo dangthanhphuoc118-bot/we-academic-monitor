@@ -56,9 +56,11 @@ export type StudentCheckQueueItem = {
   className: string | null;
   level: string;
   scheduledDate: string;
+  programCode: string;
   status: "pending" | "completed";
   createdBy: string;
   completedAt: string | null;
+  unitNumbersJson: string;
 };
 
 export const programs: ProgramDefinition[] = [

@@ -240,9 +240,10 @@ test("Saving and editing a student check updates its rolling history without dup
   const { item } = await created.json();
   assert.equal(item.result, "Good");
   const savedEvaluation = JSON.parse(sqlite.prepare("SELECT evaluation_json AS evaluationJson FROM learning_checks WHERE id=?").get(item.id).evaluationJson);
-  assert.deepEqual(savedEvaluation.pattern, body.evaluation.pattern);
-  assert.deepEqual(savedEvaluation.free, body.evaluation.free);
-  assert.equal(savedEvaluation.pronunciation, "clear");
+  assert.deepEqual(savedEvaluation.pattern, { ...body.evaluation.pattern, pronunciation: "clear" });
+  assert.deepEqual(savedEvaluation.free, { ...body.evaluation.free, pronunciation: "clear" });
+  assert.equal(savedEvaluation.pronunciation, undefined);
+  assert.deepEqual(savedEvaluation.unitNumbers, [2]);
   assert.equal(savedEvaluation.freestyleCategory, "General");
   assert.equal(savedEvaluation.patternPercent, 90);
   assert.equal(savedEvaluation.freestylePercent, 80);
@@ -258,6 +259,38 @@ test("Saving and editing a student check updates its rolling history without dup
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, checkedAt: "2026-02-30" }))).status, 400);
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, checkedAt: "2025-10-19" }))).status, 400);
   assert.equal((await academic.POST(req("/api/academic", "academic_leader", { ...body, evaluation: { ...body.evaluation, freestyleQuestions: ["Only one?"] } }))).status, 400);
+});
+
+test("A planned check opens multiple units and completes by queue id even on a different date", async () => {
+  const scheduled = await academic.POST(req("/api/academic", "academic_leader", {
+    action: "upsertPlannedCheck", studentId: 1, scheduledDate: "2026-09-17", unitNumbers: [2, 1],
+  }));
+  assert.equal(scheduled.status, 201, await scheduled.clone().text());
+  const { item: planned } = await scheduled.json();
+  assert.equal(planned.unitNumbersJson, "[1,2]");
+  assert.equal(planned.programCode, "FLYERS");
+  const wrongUnits = await academic.POST(req("/api/academic", "academic_leader", {
+    action: "createLearningCheck", queueId: planned.id, studentId: 1, programCode: "FLYERS", unitNumber: 2,
+    unitNumbers: [2], checkedAt: "2026-09-19", evaluation: {},
+  }));
+  assert.equal(wrongUnits.status, 409);
+  const questions = ["Flyers question A?", "Flyers question B?", "Flyers question C?", "Flyers question D?", "Flyers question E?"];
+  const created = await academic.POST(req("/api/academic", "academic_leader", {
+    action: "createLearningCheck", queueId: planned.id, studentId: 1, programCode: "FLYERS", unitNumber: 1,
+    unitNumbers: [1, 2], checkedAt: "2026-09-19", notes: "Two units", evaluation: {
+      patternPercent: 82, freestylePercent: 78, pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" },
+      free: { pronunciation: "unclear", oneOrMany: "incorrect", amIsAre: "correct" },
+      freestyleCategory: "General", freestyleQuestions: questions,
+    },
+  }));
+  assert.equal(created.status, 201, await created.clone().text());
+  const { item: check } = await created.json();
+  assert.equal(check.unitLabel, "Unit 1, Unit 2");
+  assert.deepEqual(JSON.parse(check.evaluationJson).unitNumbers, [1, 2]);
+  assert.equal(JSON.parse(check.evaluationJson).free.pronunciation, "unclear");
+  assert.equal(sqlite.prepare("SELECT status FROM student_check_queue WHERE id=?").get(planned.id).status, "completed");
+  assert.equal((await academic.POST(req("/api/academic", "academic_leader", { action: "deleteLearningCheck", id: check.id }))).status, 200);
+  assert.equal(sqlite.prepare("SELECT status FROM student_check_queue WHERE id=?").get(planned.id).status, "pending");
 });
 
 test("Observation snapshot remains readable and editable when teacher/class are removed", async () => {

@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
 import { curriculumDefaults } from "../lib/curriculum.ts";
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { CurriculumManager, CurriculumStudentCheck } from "../app/curriculum-check.tsx";
 import { normalizeCambridgeEvaluation } from "../lib/cambridge-evaluation.ts";
 import { defaultFreestyleBanks, eligibleFreestyleCategories, flattenFreestyleCategories, freestyleCategoryQuestions, sampleFreestyleQuestionsFromCategory, sampleSpeakingQuestions, splitFreestyleQuestions } from "../lib/speaking-questions.ts";
 import { parseVocabularyGroups, vocabularyGroupLabels } from "../lib/vocabulary.ts";
@@ -100,28 +103,61 @@ test("Dashboard and check form do not render aggregate /5 scores", () => {
 test("Detailed criteria and grade classification are retained", () => {
   const dashboard = readFileSync(new URL("../app/academic-dashboard.tsx", import.meta.url), "utf8");
   const form = readFileSync(new URL("../app/curriculum-check.tsx", import.meta.url), "utf8");
-  for (const label of ["Vocabulary", "Pronunciation", "Pattern · Điểm %", "Free · Điểm %"]) assert.ok(dashboard.includes(`label: "${label}"`));
+  for (const label of ["Vocabulary", "Pattern · Pronunciation", "Free · Pronunciation", "Pattern · Điểm %", "Free · Điểm %"]) assert.ok(dashboard.includes(`label: "${label}"`));
   assert.ok(form.includes('hasRedflagComponent ? "Redflag" : overallPercent > 80 ? "Good" : "Average"'));
   assert.ok(form.includes("CambridgeEvaluationMatrix"));
   assert.ok(form.includes('id="pattern-percent"'));
   assert.ok(form.includes('id="free-percent"'));
-  assert.ok(form.includes("Pronunciation dùng chung"));
+  assert.ok(form.includes('label="Pattern pronunciation"'));
+  assert.ok(form.includes('label="Free pronunciation"'));
   assert.ok(form.includes("sampleFreestyleQuestionsFromCategory"));
 });
 
-test("Cambridge matrix keeps one shared pronunciation and reads legacy checks", () => {
+test("Cambridge pronunciation is independent and legacy shared values fill both columns", () => {
   const legacy = normalizeCambridgeEvaluation({ pronunciation: "clear", oneOrMany: "correct", amIsAre: "incorrect" });
   assert.deepEqual(legacy.pattern, legacy.free);
-  assert.equal(legacy.pronunciation, "clear");
+  assert.equal(legacy.pattern.pronunciation, "clear");
+  assert.equal(legacy.free.pronunciation, "clear");
   const previousMatrix = normalizeCambridgeEvaluation({
     pattern: { pronunciation: "clear", oneOrMany: "correct", amIsAre: "correct" },
     free: { pronunciation: "unclear", oneOrMany: "incorrect", amIsAre: "correct" },
   });
-  assert.equal(previousMatrix.pronunciation, "clear");
+  assert.equal(previousMatrix.pattern.pronunciation, "clear");
+  assert.equal(previousMatrix.free.pronunciation, "unclear");
   const current = normalizeCambridgeEvaluation({ pronunciation: "unclear", pattern: { oneOrMany: "correct", amIsAre: "correct" }, free: { oneOrMany: "incorrect", amIsAre: "correct" } });
-  assert.equal(current.pronunciation, "unclear");
+  assert.equal(current.pattern.pronunciation, "unclear");
+  assert.equal(current.free.pronunciation, "unclear");
   assert.equal(current.pattern.oneOrMany, "correct");
   assert.equal(current.free.oneOrMany, "incorrect");
+});
+
+test("Baby Stars offers the eight supplied Freestyle questions", () => {
+  assert.deepEqual(flattenFreestyleCategories(defaultFreestyleBanks.BABY_STARS), [
+    "Can you spell it?", "Do you like it?", "Would you like to paint it red?",
+    "Can you count the eggs?", "Can you draw an egg?", "What’s this?",
+    "What color is it?", "How many eggs are there?",
+  ]);
+});
+
+test("Curriculum and Baby Stars check keep rendering if an older question module lacks the Baby bank", () => {
+  const babyBank = defaultFreestyleBanks.BABY_STARS;
+  delete defaultFreestyleBanks.BABY_STARS;
+  try {
+    const manager = renderToString(React.createElement(CurriculumManager, {
+      curriculum: curriculumDefaults, freestyleBanks: [], onReload: async () => {},
+    }));
+    assert.ok(manager.includes("Nội dung khung đánh giá"));
+    const check = renderToString(React.createElement(CurriculumStudentCheck, {
+      classes: [{ id: 1, name: "Baby A", level: "Baby Stars", schedule: "", teacherName: null }],
+      students: [{ id: 1, name: "Test", classId: 1, className: "Baby A", level: "Baby Stars" }],
+      curriculum: curriculumDefaults, freestyleBanks: [], levelOptions: [], feedbackOptions: [],
+      selectedClassId: "1", setSelectedClassId: () => {}, selectedStudentId: "1", setSelectedStudentId: () => {},
+      onSaved: () => {}, openFeedbackOptions: () => {},
+    }));
+    assert.ok(check.includes("SPELLING"));
+  } finally {
+    defaultFreestyleBanks.BABY_STARS = babyBank;
+  }
 });
 
 test("Vocabulary is rendered as compact bullet lists instead of chips", () => {

@@ -1,4 +1,4 @@
-export type SpeakingProgramCode = "STARTERS" | "MOVERS" | "FLYERS";
+export type SpeakingProgramCode = "BABY_STARS" | "STARTERS" | "MOVERS" | "FLYERS";
 
 export type FreestyleQuestionCategory = {
   category: string;
@@ -14,6 +14,11 @@ export type FreestyleBank = {
 };
 
 export const defaultFreestyleBanks: Record<SpeakingProgramCode, FreestyleQuestionCategory[]> = {
+  BABY_STARS: [{
+    category: "Câu hỏi chung",
+    yesNoQuestions: ["Can you spell it?", "Do you like it?", "Would you like to paint it red?", "Can you count the eggs?", "Can you draw an egg?"],
+    whQuestions: ["What’s this?", "What color is it?", "How many eggs are there?"],
+  }],
   STARTERS: [
     {
       category: "Personal information",
