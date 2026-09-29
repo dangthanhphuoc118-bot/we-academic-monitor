@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import {
   BookOpen,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   Languages,
   LoaderCircle,
@@ -134,12 +135,29 @@ function parseList(value?: string) {
   try { const parsed = value ? JSON.parse(value) : []; return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : []; } catch { return []; }
 }
 
-type UnitScore = {
+export type UnitScore = {
   spellingPercent: string; writingPercent: string; vocabularyCorrect: string; communicationPercent: string; pronunciation: string;
   patternPercent: string; freestylePercent: string; patternPronunciation: string; freePronunciation: string;
   patternOneOrMany: string; freeOneOrMany: string; patternAmIsAre: string; freeAmIsAre: string;
   freestyleCategory: string; freestyleQuestions: string[];
 };
+
+export function isUnitScoreComplete(group: EvaluationGroup, score: UnitScore, programGroup: ProgramGroup, categories: FreestyleQuestionCategory[], editing = false) {
+  const validPercent = (value: string) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100;
+  if (programGroup === "baby") return validPercent(score.spellingPercent) && validPercent(score.writingPercent);
+  if (programGroup === "super") {
+    const max = group.units.reduce((sum, unit) => sum + unit.vocabularyMax, 0);
+    return score.vocabularyCorrect.trim() !== "" && Number.isInteger(Number(score.vocabularyCorrect)) && Number(score.vocabularyCorrect) >= 0 && Number(score.vocabularyCorrect) <= max
+      && validPercent(score.communicationPercent) && ["clear", "unclear"].includes(score.pronunciation);
+  }
+  const category = categories.find((item) => item.category === score.freestyleCategory);
+  const available = category ? freestyleCategoryQuestions(category) : [];
+  const questionsComplete = editing ? score.freestyleQuestions.length > 0 : available.length > 0 && score.freestyleQuestions.length === available.length && score.freestyleQuestions.every((question) => available.includes(question));
+  return validPercent(score.patternPercent) && validPercent(score.freestylePercent) && questionsComplete && isCompleteCambridgeEvaluation({
+    pattern: { pronunciation: score.patternPronunciation as CambridgePronunciation | "", oneOrMany: score.patternOneOrMany as CambridgeBinary | "", amIsAre: score.patternAmIsAre as CambridgeBinary | "" },
+    free: { pronunciation: score.freePronunciation as CambridgePronunciation | "", oneOrMany: score.freeOneOrMany as CambridgeBinary | "", amIsAre: score.freeAmIsAre as CambridgeBinary | "" },
+  });
+}
 
 function UnitEvaluationCard({ group, programLabel, programGroup, studentName, className, score, onChange, freestyleCategories, topicOptions, editing }: {
   group: EvaluationGroup; programLabel: string; programGroup: ProgramGroup; studentName: string; className: string;
@@ -197,6 +215,8 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
     ? initialEvaluation.unitNumbers.filter((value): value is number => typeof value === "number" && Number.isInteger(value))
     : editingCheck ? [editingCheck.unitNumber] : [];
   const [unitNumbers, setUnitNumbers] = useState<number[]>(initialUnitNumbers?.length ? initialUnitNumbers : savedUnitNumbers.length ? savedUnitNumbers : programUnits[0] ? [programUnits[0].unitNumber] : []);
+  const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
+  const [singleCollapsed, setSingleCollapsed] = useState(false);
   const selectedUnits = programUnits.filter((item) => unitNumbers.includes(item.unitNumber));
   const groups = evaluationGroups(selectedUnits);
   const unit = selectedUnits[0];
@@ -231,19 +251,12 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
   const [saving, setSaving] = useState(false);
 
   const resetEvaluation = () => {
-    setScores({}); setNotes(""); setSelectedFeedbackIds([]);
+    setScores({}); setOpenGroupKey(null); setSingleCollapsed(false); setNotes(""); setSelectedFeedbackIds([]);
   };
 
   const percent = (value: string) => Math.min(100, Math.max(0, Number(value) || 0));
-  const complete = groups.length > 0 && groups.every((group) => {
-    const score = scoreFor(group);
-    if (program?.group === "baby") return score.spellingPercent !== "" && score.writingPercent !== "";
-    if (program?.group === "super") return score.vocabularyCorrect !== "" && score.communicationPercent !== "" && Boolean(score.pronunciation);
-    return score.patternPercent !== "" && score.freestylePercent !== "" && score.freestyleQuestions.length > 0 && isCompleteCambridgeEvaluation({
-      pattern: { pronunciation: score.patternPronunciation as CambridgePronunciation | "", oneOrMany: score.patternOneOrMany as CambridgeBinary | "", amIsAre: score.patternAmIsAre as CambridgeBinary | "" },
-      free: { pronunciation: score.freePronunciation as CambridgePronunciation | "", oneOrMany: score.freeOneOrMany as CambridgeBinary | "", amIsAre: score.freeAmIsAre as CambridgeBinary | "" },
-    });
-  });
+  const programGroup = program?.group ?? "baby";
+  const complete = Boolean(program) && groups.length > 0 && groups.every((group) => isUnitScoreComplete(group, scoreFor(group), programGroup, freestyleTopicOptions, Boolean(editingCheck)));
   const components = groups.flatMap((group) => {
     const score = scoreFor(group);
     if (program?.group === "baby") return [percent(score.spellingPercent), percent(score.writingPercent)];
@@ -285,9 +298,18 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
     {embedded ? <Card className="border-0 bg-slate-50 shadow-none"><CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,1fr)]"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Học viên đã chọn</p><p className="mt-1 font-bold text-[#102233]">{student?.name}</p><p className="text-sm text-muted-foreground">{classInfo?.name || "Chưa xếp lớp"} · {student?.level}</p></div><div><Label className="mb-2">Nội dung kiểm tra</Label><UnitSelector units={programUnits} selected={unitNumbers} disabled={Boolean(editingCheck) || Boolean(queueId)} onChange={(value) => { setUnitNumbers(value); resetEvaluation(); }} /></div></CardContent></Card> : <Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardContent className="grid gap-4 p-5 lg:grid-cols-3"><div><Label className="mb-2">1. Lớp học</Label><Picker value={selectedClassId} onChange={(value) => { setSelectedClassId(value); setUnitNumbers([]); resetEvaluation(); setSelectedStudentId(""); }} placeholder="Chọn lớp" options={classes.map((item) => ({ value: String(item.id), label: item.name }))} /></div><div><Label className="mb-2">2. Học viên</Label><Picker value={selectedStudentId} onChange={(value) => { setUnitNumbers([]); resetEvaluation(); setSelectedStudentId(value); }} placeholder="Chọn học viên" disabled={!selectedClassId} options={filteredStudents.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.level}` }))} /></div><div><Label className="mb-2">3. Nội dung kiểm tra</Label><UnitSelector units={programUnits} selected={unitNumbers} disabled={Boolean(editingCheck) || Boolean(queueId)} onChange={(value) => { setUnitNumbers(value); resetEvaluation(); }} /></div></CardContent></Card>}
     {student && !program ? <EmptyBox title="Chưa xác định đúng chương trình" description={`Học viên đang được đặt trình độ “${student.level}”. Hãy chỉnh thành Baby Stars, Super Kids 1–8, Starters, Movers hoặc Flyers.`} /> : null}
     {student && program && unit ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,.75fr)]">
-      <div className="space-y-5">{selectedUnits.map((item) => {
-        const group = groups.find((entry) => entry.unitNumbers.at(-1) === item.unitNumber);
-        return <div key={item.unitNumber} className="space-y-5"><CurriculumReference unit={item} />{group ? <UnitEvaluationCard group={group} programLabel={program.label} programGroup={program.group} studentName={student.name} className={classInfo?.name || ""} score={scoreFor(group)} onChange={(patch) => updateScore(group, patch)} freestyleCategories={levelFreestyleCategories} topicOptions={freestyleTopicOptions} editing={Boolean(editingCheck)} /> : null}</div>;
+      <div className="space-y-3"><p className="px-1 text-sm text-muted-foreground">{selectedUnits.length > 1 ? `Chọn một Unit để xem nội dung và chấm điểm · ${groups.filter((group) => isUnitScoreComplete(group, scoreFor(group), program.group, freestyleTopicOptions, Boolean(editingCheck))).length}/${groups.length} mục đã hoàn tất` : "Nội dung và tiêu chí kiểm tra"}</p>{groups.map((group) => {
+        const key = group.unitNumbers.join("-");
+        const isOpen = selectedUnits.length === 1 ? !singleCollapsed : openGroupKey === key;
+        const done = isUnitScoreComplete(group, scoreFor(group), program.group, freestyleTopicOptions, Boolean(editingCheck));
+        const title = group.units.length > 1 ? `All reviews · Day ${group.units[0].unitNumber}–${group.units[group.units.length - 1].unitNumber}` : group.label;
+        return <section key={key} className={`overflow-hidden rounded-2xl border shadow-[0_6px_20px_rgba(18,48,67,0.05)] ${done ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}>
+          <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left sm:px-5" aria-expanded={isOpen} aria-controls={`unit-check-${key}`} onClick={() => selectedUnits.length === 1 ? setSingleCollapsed((current) => !current) : setOpenGroupKey(isOpen ? null : key)}>
+            <span className="min-w-0"><span className={`block text-base font-bold ${done ? "text-emerald-900" : "text-[#143b63]"}`}>{title}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{group.units.length > 1 ? `${group.units.length} Day · Một bảng Evaluation Criteria` : group.units[0].topic}</span></span>
+            <span className="flex shrink-0 items-center gap-2"><span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${done ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}>{done ? <><CheckCircle2 className="size-3.5" /> Đã hoàn tất</> : "Chưa hoàn tất"}</span><ChevronDown className={`size-5 text-slate-600 transition-transform ${isOpen ? "rotate-180" : ""}`} /></span>
+          </button>
+          <div id={`unit-check-${key}`} className={isOpen ? "space-y-5 border-t bg-white p-3 sm:p-4" : ""}>{isOpen ? <>{group.units.map((item) => <CurriculumReference key={item.unitNumber} unit={item} />)}<UnitEvaluationCard group={group} programLabel={program.label} programGroup={program.group} studentName={student.name} className={classInfo?.name || ""} score={scoreFor(group)} onChange={(patch) => updateScore(group, patch)} freestyleCategories={levelFreestyleCategories} topicOptions={freestyleTopicOptions} editing={Boolean(editingCheck)} /></> : null}</div>
+        </section>;
       })}</div>
       <Card className="h-fit border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-lg">{editingCheck ? "Cập nhật kết quả" : "Kết quả kiểm tra"}</CardTitle><Badge variant="outline">{previewResult}</Badge></div></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="check-date">Ngày đánh giá</Label><Input id="check-date" type="date" value={checkedAt} onChange={(event) => setCheckedAt(event.target.value)} /></div><div className="space-y-3"><div className="flex items-center justify-between gap-3"><Label>Nhận xét thường gặp</Label>{canManage ? <Button type="button" size="sm" variant="ghost" onClick={openFeedbackOptions}><Settings2 /> Quản lý</Button> : null}</div>{feedbackOptions.filter((item) => item.active).length ? <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border bg-slate-50/70 p-3">{Array.from(new Set(feedbackOptions.filter((item) => item.active).map((item) => item.category))).map((category) => <div key={category}><p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{category}</p><div className="space-y-2">{feedbackOptions.filter((item) => item.active && item.category === category).map((item) => <label key={item.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-sm leading-5 shadow-sm"><Checkbox checked={selectedFeedbackIds.includes(item.id)} onCheckedChange={(checked) => setSelectedFeedbackIds((current) => checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span>{item.label}</span></label>)}</div></div>)}</div> : canManage ? <Button type="button" variant="outline" className="w-full" onClick={openFeedbackOptions}><Settings2 /> Thêm mẫu nhận xét</Button> : <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Chưa có mẫu nhận xét đang sử dụng.</p>}</div><div><Label htmlFor="check-notes">Nhận xét / lý do khác</Label><Textarea id="check-notes" value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} placeholder="Nhập nội dung khác ngoài các lựa chọn phía trên..." /></div><Button className="w-full bg-[#ff7a3d] hover:bg-[#e9652f]" disabled={!complete || saving} onClick={save}>{saving ? <LoaderCircle className="animate-spin" /> : <Save />} {editingCheck ? "Cập nhật kết quả" : "Lưu đánh giá"}</Button></CardContent></Card>
     </div> : null}
