@@ -9,6 +9,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Khung chương trình Baby Stars, Super Kids 1–8, Starters, Movers và Flyers.
 - Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
+- Khi kiểm tra nhiều Unit, nội dung và bảng chấm được thu gọn theo từng mục; bấm vào mục để mở, mục đã chấm đủ chuyển xanh lá. Điểm vẫn được giữ khi chuyển giữa các mục.
 - Phiếu Starters/Movers/Flyers chọn một chủ đề Freestyle rồi hiển thị toàn bộ câu trong chủ đề đó theo hai cột YES/NO và WH QUESTIONS.
 - Phần chấm Cambridge có điểm % và Pronunciation Clear/Unclear riêng cho Pattern và Free; One/Many và Am/Is/Are cũng được đánh giá theo từng cột.
 - Baby Stars có sẵn 8 câu Freestyle chung cho level, hiển thị ngay trong phiếu kiểm tra và có thể chỉnh sửa ở Khung chương trình.
@@ -43,7 +44,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 ## Hướng dẫn nhanh
 
-**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật thứ tự Unit](HUONG-DAN-CAP-NHAT-THU-TU-UNIT-28-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
+**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật phiếu kiểm tra](HUONG-DAN-THU-GON-UNIT-29-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
 
 Toàn bộ hướng dẫn từng bước nằm trong file [HUONG-DAN-SETUP.md](HUONG-DAN-SETUP.md).
 

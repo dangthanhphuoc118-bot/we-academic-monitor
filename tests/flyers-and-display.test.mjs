@@ -5,10 +5,11 @@ import ts from "typescript";
 import { curriculumDefaults, PREVIOUS_LEVEL_REVIEW_UNIT_NUMBER } from "../lib/curriculum.ts";
 import React from "react";
 import { renderToString } from "react-dom/server";
-import { CurriculumManager, CurriculumStudentCheck } from "../app/curriculum-check.tsx";
+import { CurriculumManager, CurriculumStudentCheck, isUnitScoreComplete } from "../app/curriculum-check.tsx";
 import { normalizeCambridgeEvaluation } from "../lib/cambridge-evaluation.ts";
 import { defaultFreestyleBanks, eligibleFreestyleCategories, flattenFreestyleCategories, freestyleCategoryQuestions, sampleFreestyleQuestionsFromCategory, sampleSpeakingQuestions, splitFreestyleQuestions } from "../lib/speaking-questions.ts";
 import { parseReviewVocabularySections, parseVocabularyGroups, vocabularyGroupLabels } from "../lib/vocabulary.ts";
+import { evaluationGroups } from "../lib/unit-evaluation.ts";
 
 const flyers = curriculumDefaults.filter((unit) => unit.programCode === "FLYERS");
 
@@ -197,15 +198,54 @@ test("Existing All reviews vocabulary is also separated into Unit sections", () 
   ]);
 });
 
-test("Multi-unit check alternates each reference with its Evaluation Criteria", () => {
+test("Multiple selected Units start collapsed; a single Unit stays open", () => {
+  const props = {
+    classes: [{ id: 1, name: "Super A", level: "Super Kids 4", schedule: "", teacherName: null }],
+    students: [{ id: 1, name: "Test", classId: 1, className: "Super A", level: "Super Kids 4" }],
+    curriculum: curriculumDefaults, freestyleBanks: [], levelOptions: [], feedbackOptions: [],
+    selectedClassId: "1", setSelectedClassId: () => {}, selectedStudentId: "1", setSelectedStudentId: () => {},
+    onSaved: () => {}, openFeedbackOptions: () => {},
+  };
+  const multiple = renderToString(React.createElement(CurriculumStudentCheck, { ...props, initialUnitNumbers: [4, 5] }));
+  assert.match(multiple, /aria-expanded="false" aria-controls="unit-check-4"/);
+  assert.match(multiple, /aria-expanded="false" aria-controls="unit-check-5"/);
+  assert.doesNotMatch(multiple, /Evaluation Criteria · <!-- -->Unit 4/);
+  const single = renderToString(React.createElement(CurriculumStudentCheck, { ...props, initialUnitNumbers: [4] }));
+  assert.match(single, /aria-expanded="true" aria-controls="unit-check-4"/);
+  assert.match(single, /Unit 4: Months[\s\S]*Evaluation Criteria · <!-- -->Unit 4/);
+});
+
+test("Several Baby Stars All reviews Days collapse into one scoring section", () => {
   const html = renderToString(React.createElement(CurriculumStudentCheck, {
+    classes: [{ id: 1, name: "Baby A", level: "Baby Stars", schedule: "", teacherName: null }],
+    students: [{ id: 1, name: "Test", classId: 1, className: "Baby A", level: "Baby Stars" }],
+    curriculum: curriculumDefaults, freestyleBanks: [], levelOptions: [], feedbackOptions: [],
+    selectedClassId: "1", setSelectedClassId: () => {}, selectedStudentId: "1", setSelectedStudentId: () => {},
+    initialUnitNumbers: [26, 27], onSaved: () => {}, openFeedbackOptions: () => {},
+  }));
+  assert.match(html, /All reviews · Day 26–27/);
+  assert.match(html, /aria-expanded="false" aria-controls="unit-check-26-27"/);
+  assert.doesNotMatch(html, /Evaluation Criteria · <!-- -->All reviews/);
+});
+
+test("A Unit turns green only when all its scoring fields are complete", () => {
+  const unit = curriculumDefaults.find((item) => item.programCode === "SUPER_KIDS_4" && item.unitNumber === 4);
+  const group = evaluationGroups([unit])[0];
+  const blank = { spellingPercent: "", writingPercent: "", vocabularyCorrect: "", communicationPercent: "", pronunciation: "", patternPercent: "", freestylePercent: "", patternPronunciation: "", freePronunciation: "", patternOneOrMany: "", freeOneOrMany: "", patternAmIsAre: "", freeAmIsAre: "", freestyleCategory: "", freestyleQuestions: [] };
+  const score = { ...blank, vocabularyCorrect: String(unit.vocabularyMax), communicationPercent: "90", pronunciation: "clear" };
+  assert.equal(isUnitScoreComplete(group, { ...score, communicationPercent: "" }, "super", []), false);
+  assert.equal(isUnitScoreComplete(group, { ...score, vocabularyCorrect: String(unit.vocabularyMax + 1) }, "super", []), false);
+  assert.equal(isUnitScoreComplete(group, score, "super", []), true);
+  const props = {
     classes: [{ id: 1, name: "Super A", level: "Super Kids 4", schedule: "", teacherName: null }],
     students: [{ id: 1, name: "Test", classId: 1, className: "Super A", level: "Super Kids 4" }],
     curriculum: curriculumDefaults, freestyleBanks: [], levelOptions: [], feedbackOptions: [],
     selectedClassId: "1", setSelectedClassId: () => {}, selectedStudentId: "1", setSelectedStudentId: () => {},
     initialUnitNumbers: [4, 5], onSaved: () => {}, openFeedbackOptions: () => {},
-  }));
-  const positions = ["Unit 4: Months", "Evaluation Criteria · <!-- -->Unit 4", "Unit 5: Careers", "Evaluation Criteria · <!-- -->Unit 5"].map((value) => html.indexOf(value));
-  assert.ok(positions.every((value) => value >= 0), positions);
-  assert.deepEqual([...positions].sort((a, b) => a - b), positions);
+    editingCheck: { programCode: "SUPER_KIDS_4", unitNumber: 4, checkedAt: "2026-09-29", notes: "", feedbackJson: "[]", evaluationJson: JSON.stringify({ unitNumbers: [4, 5], unitEvaluations: [{ unitNumbers: [4], vocabularyCorrect: unit.vocabularyMax, communicationPercent: 90, pronunciation: "clear" }] }) },
+  };
+  const html = renderToString(React.createElement(CurriculumStudentCheck, props));
+  assert.match(html, /border-emerald-300 bg-emerald-50[^>]*>[\s\S]*?aria-controls="unit-check-4"/);
+  assert.match(html, /aria-controls="unit-check-4"[\s\S]*?Đã hoàn tất/);
+  assert.match(html, /aria-controls="unit-check-5"[\s\S]*?Chưa hoàn tất/);
 });
