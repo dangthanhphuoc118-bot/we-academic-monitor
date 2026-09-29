@@ -47,6 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { CurriculumManager, CurriculumStudentCheck, type FeedbackOption, type LevelOption } from "./curriculum-check";
 import { normalizeCambridgeEvaluation } from "@/lib/cambridge-evaluation";
+import { choiceCriterionTone, criterionCellClass, criterionTileClass, percentCriterionTone, vocabularyCriterionTone, type CriterionTone } from "@/lib/criterion-colors";
 import { curriculumDefaults, programs, type CurriculumUnit, type LearningCheck, type StudentCheckQueueItem } from "@/lib/curriculum";
 import type { FreestyleBank } from "@/lib/speaking-questions";
 import { AccountManager, LoginScreen, roleLabels, type CurrentUser } from "./auth-components";
@@ -67,7 +68,7 @@ type TeacherRow = { id: number; name: string; email: string; phone: string; spec
 type CriterionRow = { id: number; targetType: "student" | "teacher"; level: string; category: string; title: string; description: string; weight: number; active: number; sortOrder: number };
 type StudentAssessment = { id: number; studentId: number; studentName: string; classId: number | null; className: string | null; evaluatorName: string; overallScore: number; result: string; summary: string; actionPlan: string; checkedAt: string };
 type TeacherReview = { id: number; teacherId: number; teacherName: string; reviewerName: string; overallScore: number; result: string; summary: string; actionPlan: string; observedAt: string };
-export type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string; unitLabel?: string };
+export type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string; unitLabel?: string; tone?: CriterionTone };
 type StudentProgressRecord = { id: number; studentId: number; studentName: string; classId: number | null; className: string | null; overallScore: number; result: string; checkedAt: string; source: "legacy" | "curriculum"; programLabel?: string; unitLabel?: string; teacherName?: string; reason: string; criteria: EvaluationCriterion[] };
 type AcademicData = { classes: ClassRow[]; students: StudentRow[]; teachers: TeacherRow[]; criteria: CriterionRow[]; studentAssessments: StudentAssessment[]; teacherReviews: TeacherReview[]; teacherObservations: TeacherObservation[]; curriculum: CurriculumUnit[]; freestyleBanks: FreestyleBank[]; learningChecks: LearningCheck[]; levelOptions: LevelOption[]; feedbackOptions: FeedbackOption[]; checkQueue: StudentCheckQueueItem[] };
 
@@ -401,28 +402,28 @@ function LoadError({ message, retry }: { message: string; retry: () => void }) {
   return <EmptyPanel icon={AlertTriangle} title="Chưa tải được dữ liệu" description={message} action={<Button onClick={retry}><RefreshCw /> Thử lại</Button>} />;
 }
 
-function evaluationCriteria(check: LearningCheck) {
+export function evaluationCriteria(check: LearningCheck) {
   let evaluation: Record<string, unknown> = {};
   try { evaluation = JSON.parse(check.evaluationJson || "{}") as Record<string, unknown>; } catch { evaluation = {}; }
   const program = programs.find((item) => item.code === check.programCode);
   const percent = (value: unknown) => `${Number(value) || 0}%`;
   const choice = (value: unknown) => String(value || "—").toUpperCase();
   const rows = (value: Record<string, unknown>): EvaluationCriterion[] => program?.group === "baby" ? [
-    { label: "Spelling", value: percent(value.spellingPercent) },
-    { label: "Writing", value: percent(value.writingPercent) },
+    { label: "Spelling", value: percent(value.spellingPercent), tone: percentCriterionTone(value.spellingPercent, 50) },
+    { label: "Writing", value: percent(value.writingPercent), tone: percentCriterionTone(value.writingPercent, 50) },
   ] : program?.group === "super" ? [
-    { label: "Vocabulary", value: `${Number(value.vocabularyCorrect) || 0}/${Number(value.vocabularyMax) || 0}` },
-    { label: "Communication", value: percent(value.communicationPercent) },
-    { label: "Pronunciation", value: choice(value.pronunciation) },
+    { label: "Vocabulary", value: `${Number(value.vocabularyCorrect) || 0}/${Number(value.vocabularyMax) || 0}`, tone: vocabularyCriterionTone(value.vocabularyCorrect, value.vocabularyMax) },
+    { label: "Communication", value: percent(value.communicationPercent), tone: percentCriterionTone(value.communicationPercent, 60) },
+    { label: "Pronunciation", value: choice(value.pronunciation), tone: choiceCriterionTone(value.pronunciation) },
   ] : (() => { const matrix = normalizeCambridgeEvaluation(value); return [
-    { label: "Pattern · Pronunciation", criterion: "Pronunciation", category: "Pattern" as const, value: choice(matrix.pattern.pronunciation) },
-    { label: "Free · Pronunciation", criterion: "Pronunciation", category: "Free" as const, value: choice(matrix.free.pronunciation) },
-    { label: "Pattern · Điểm %", criterion: "Điểm %", category: "Pattern" as const, value: percent(value.patternPercent) },
-    { label: "Free · Điểm %", criterion: "Điểm %", category: "Free" as const, value: percent(value.freestylePercent) },
-    { label: "Pattern · One / Many", criterion: "One / Many", category: "Pattern" as const, value: choice(matrix.pattern.oneOrMany) },
-    { label: "Free · One / Many", criterion: "One / Many", category: "Free" as const, value: choice(matrix.free.oneOrMany) },
-    { label: "Pattern · Am / Is / Are", criterion: "Am / Is / Are", category: "Pattern" as const, value: choice(matrix.pattern.amIsAre) },
-    { label: "Free · Am / Is / Are", criterion: "Am / Is / Are", category: "Free" as const, value: choice(matrix.free.amIsAre) },
+    { label: "Pattern · Pronunciation", criterion: "Pronunciation", category: "Pattern" as const, value: choice(matrix.pattern.pronunciation), tone: choiceCriterionTone(matrix.pattern.pronunciation) },
+    { label: "Free · Pronunciation", criterion: "Pronunciation", category: "Free" as const, value: choice(matrix.free.pronunciation), tone: choiceCriterionTone(matrix.free.pronunciation) },
+    { label: "Pattern · Điểm %", criterion: "Điểm %", category: "Pattern" as const, value: percent(value.patternPercent), tone: percentCriterionTone(value.patternPercent, 60) },
+    { label: "Free · Điểm %", criterion: "Điểm %", category: "Free" as const, value: percent(value.freestylePercent), tone: percentCriterionTone(value.freestylePercent, 60) },
+    { label: "Pattern · One / Many", criterion: "One / Many", category: "Pattern" as const, value: choice(matrix.pattern.oneOrMany), tone: choiceCriterionTone(matrix.pattern.oneOrMany) },
+    { label: "Free · One / Many", criterion: "One / Many", category: "Free" as const, value: choice(matrix.free.oneOrMany), tone: choiceCriterionTone(matrix.free.oneOrMany) },
+    { label: "Pattern · Am / Is / Are", criterion: "Am / Is / Are", category: "Pattern" as const, value: choice(matrix.pattern.amIsAre), tone: choiceCriterionTone(matrix.pattern.amIsAre) },
+    { label: "Free · Am / Is / Are", criterion: "Am / Is / Are", category: "Free" as const, value: choice(matrix.free.amIsAre), tone: choiceCriterionTone(matrix.free.amIsAre) },
   ]; })();
   if (!Array.isArray(evaluation.unitEvaluations)) return rows(evaluation);
   return evaluation.unitEvaluations.flatMap((item) => {
@@ -435,16 +436,20 @@ function evaluationCriteria(check: LearningCheck) {
   });
 }
 
-function EvaluationCriteriaGrid({ criteria }: { criteria: EvaluationCriterion[] }) {
+function CriterionLegend() {
+  return <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold"><span className="flex items-center gap-1 text-emerald-800"><span className="size-2 rounded-full bg-emerald-500" />Good</span><span className="flex items-center gap-1 text-amber-800"><span className="size-2 rounded-full bg-amber-500" />Average</span><span className="flex items-center gap-1 text-rose-800"><span className="size-2 rounded-full bg-rose-500" />Redflag</span></div>;
+}
+
+export function EvaluationCriteriaGrid({ criteria }: { criteria: EvaluationCriterion[] }) {
   const labels = Array.from(new Set(criteria.map((item) => item.unitLabel).filter((label): label is string => Boolean(label))));
   if (labels.length) return <div className="mt-2 space-y-3">{labels.map((label) => <div key={label} className="rounded-lg border bg-slate-50 p-3"><p className="mb-2 text-sm font-bold text-[#143b63]">{label}</p><EvaluationCriteriaGrid criteria={criteria.filter((item) => item.unitLabel === label).map((item) => ({ ...item, unitLabel: undefined }))} /></div>)}</div>;
   const matrix = criteria.some((item) => item.category);
   if (!matrix) {
-    return <div className="mt-2 grid gap-2 sm:grid-cols-2">{criteria.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label}</span><strong>{criterion.value}</strong></div>)}</div>;
+    return <div className="mt-2 grid gap-2 sm:grid-cols-2">{criteria.map((criterion) => <div key={criterion.label} className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${criterion.tone ? criterionTileClass[criterion.tone] : "border-slate-100 bg-white"}`}><span>{criterion.label}</span><strong>{criterion.value}</strong></div>)}</div>;
   }
   const shared = criteria.filter((item) => !item.category);
   const rows = ["Điểm %", "Pronunciation", "One / Many", "Am / Is / Are"];
-  return <div className="mt-2 space-y-2">{shared.map((criterion) => <div key={criterion.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span className="text-muted-foreground">{criterion.label} · dùng chung</span><strong>{criterion.value}</strong></div>)}<div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div></div>;
+  return <div className="mt-2 space-y-2">{shared.map((criterion) => <div key={criterion.label} className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${criterion.tone ? criterionTileClass[criterion.tone] : "border-slate-100 bg-white"}`}><span>{criterion.label} · dùng chung</span><strong>{criterion.value}</strong></div>)}<div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => { const item = criteria.find((entry) => entry.category === category && entry.criterion === row); return <strong key={category} className={`border-l px-3 py-2 ${item?.tone ? criterionCellClass[item.tone] : ""}`}>{item?.value || "—"}</strong>; })}</div>)}</div></div>;
 }
 
 function studentProgressRecords(data: AcademicData): StudentProgressRecord[] {
@@ -602,7 +607,7 @@ function ComparisonPieChart({ title, rows }: { title: string; rows: StudentProgr
 
 function StudentZone({ title, subtitle, rows, tone, onDelete, onEdit }: { title: string; subtitle: string; rows: { student: StudentRow; latest: StudentProgressRecord }[]; tone: "good" | "average" | "redflag"; onDelete: (item: StudentProgressRecord) => void; onEdit: (item: StudentProgressRecord) => void }) {
   const styles = { good: { border: "border-emerald-200", header: "bg-emerald-50 text-emerald-800", count: "bg-emerald-600" }, average: { border: "border-amber-200", header: "bg-amber-50 text-amber-900", count: "bg-amber-500" }, redflag: { border: "border-rose-200", header: "bg-rose-50 text-rose-800", count: "bg-rose-600" } }[tone];
-  return <Card className={`overflow-hidden border ${styles.border} shadow-[0_10px_30px_rgba(18,48,67,0.07)]`}><CardHeader className={styles.header}><div className="flex items-center justify-between gap-3"><div><CardTitle className="text-xl">{title}</CardTitle><p className="mt-1 text-sm opacity-80">{subtitle}</p></div><Badge className={`${styles.count} text-white`}>{rows.length}</Badge></div></CardHeader><CardContent className="p-4">{rows.length ? <div className="grid gap-3 lg:grid-cols-2">{rows.map(({ student, latest }) => <div key={student.id} className="rounded-xl border bg-white p-3"><div className="flex items-start gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-100 font-bold text-[#345064]">{student.name.charAt(0)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">{student.name}</p><ResultBadge value={latest.result} /></div><p className="mt-1 text-xs text-muted-foreground">{student.className || "Chưa xếp lớp"} · {student.level}</p><p className="mt-1 text-xs text-muted-foreground">{latest.programLabel ? `${latest.programLabel} · ${latest.unitLabel} · ` : ""}{formatDate(latest.checkedAt)}</p></div><div className="flex shrink-0 gap-1">{latest.source === "curriculum" ? <Button size="icon-sm" variant="ghost" onClick={() => onEdit(latest)} aria-label={`Cập nhật đánh giá của ${student.name}`}><Pencil /></Button> : null}<Button size="icon-sm" variant="ghost" className="text-destructive" onClick={() => onDelete(latest)} aria-label={`Xóa đánh giá của ${student.name}`}><Trash2 /></Button></div></div><div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Evaluation Criteria</p><EvaluationCriteriaGrid criteria={latest.criteria} /></div><div className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Nhận xét / lý do</p><p className="mt-1 whitespace-pre-line text-sm leading-5 text-[#345064]">{latest.reason || "Chưa có nhận xét hoặc lý do chi tiết."}</p></div></div>)}</div> : <p className="py-10 text-center text-sm text-muted-foreground">Chưa có học viên trong vùng này.</p>}</CardContent></Card>;
+  return <Card className={`overflow-hidden border ${styles.border} shadow-[0_10px_30px_rgba(18,48,67,0.07)]`}><CardHeader className={styles.header}><div className="flex items-center justify-between gap-3"><div><CardTitle className="text-xl">{title}</CardTitle><p className="mt-1 text-sm opacity-80">{subtitle}</p></div><Badge className={`${styles.count} text-white`}>{rows.length}</Badge></div></CardHeader><CardContent className="p-4">{rows.length ? <div className="grid gap-3 lg:grid-cols-2">{rows.map(({ student, latest }) => <div key={student.id} className="rounded-xl border bg-white p-3"><div className="flex items-start gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-100 font-bold text-[#345064]">{student.name.charAt(0)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">{student.name}</p><ResultBadge value={latest.result} /></div><p className="mt-1 text-xs text-muted-foreground">{student.className || "Chưa xếp lớp"} · {student.level}</p><p className="mt-1 text-xs text-muted-foreground">{latest.programLabel ? `${latest.programLabel} · ${latest.unitLabel} · ` : ""}{formatDate(latest.checkedAt)}</p></div><div className="flex shrink-0 gap-1">{latest.source === "curriculum" ? <Button size="icon-sm" variant="ghost" onClick={() => onEdit(latest)} aria-label={`Cập nhật đánh giá của ${student.name}`}><Pencil /></Button> : null}<Button size="icon-sm" variant="ghost" className="text-destructive" onClick={() => onDelete(latest)} aria-label={`Xóa đánh giá của ${student.name}`}><Trash2 /></Button></div></div><div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Evaluation Criteria</p><CriterionLegend /><EvaluationCriteriaGrid criteria={latest.criteria} /></div><div className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Nhận xét / lý do</p><p className="mt-1 whitespace-pre-line text-sm leading-5 text-[#345064]">{latest.reason || "Chưa có nhận xét hoặc lý do chi tiết."}</p></div></div>)}</div> : <p className="py-10 text-center text-sm text-muted-foreground">Chưa có học viên trong vùng này.</p>}</CardContent></Card>;
 }
 
 function LearningCheckHistory({ checks, onEdit, onDelete }: { checks: LearningCheck[]; onEdit: (item: LearningCheck) => void; onDelete: (item: LearningCheck) => void }) {

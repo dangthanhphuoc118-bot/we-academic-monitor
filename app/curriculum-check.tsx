@@ -91,9 +91,11 @@ function EmptyBox({ title, description, action }: { title: string; description: 
   return <Empty className="min-h-64 border bg-white/70"><EmptyHeader><EmptyMedia variant="icon"><ClipboardCheck /></EmptyMedia><EmptyTitle>{title}</EmptyTitle><EmptyDescription>{description}</EmptyDescription></EmptyHeader>{action ? <EmptyContent>{action}</EmptyContent> : null}</Empty>;
 }
 
-function NumberScore({ id, label, value, onChange, suffix = "%", max = 100 }: { id: string; label: string; value: string; onChange: (value: string) => void; suffix?: string; max?: number }) {
-  const numeric = Math.min(max, Math.max(0, Number(value) || 0));
-  return <div className="rounded-xl border bg-white p-4"><div className="flex items-start justify-between gap-3"><Label htmlFor={id} className="text-sm font-semibold">{label}</Label><div className="flex items-center gap-2"><Input id={id} type="number" inputMode="numeric" min={0} max={max} value={value} onChange={(event) => onChange(event.target.value)} className="w-24 text-right font-bold" /><span className="text-sm font-semibold text-muted-foreground">{suffix}</span></div></div><Progress value={(numeric / Math.max(max, 1)) * 100} className="mt-3 h-1.5" /></div>;
+function NumberScore({ id, label, value, onChange, suffix = "%", max = 100, wholeNumber = false }: { id: string; label: string; value: string; onChange: (value: string) => void; suffix?: string; max?: number; wholeNumber?: boolean }) {
+  const invalid = value.trim() !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > max || (wholeNumber && !Number.isInteger(Number(value))));
+  const numeric = invalid ? 0 : Math.min(max, Math.max(0, Number(value) || 0));
+  const message = wholeNumber ? `Nhập số từ đúng từ 0 đến ${max}, không nhập điểm %.${max % 2 === 0 ? ` Nếu đúng 50%, hãy nhập ${max / 2}.` : ""}` : `Nhập điểm từ 0 đến ${max}%.`;
+  return <div className={`rounded-xl border bg-white p-4 ${invalid ? "border-rose-300" : ""}`}><div className="flex items-start justify-between gap-3"><Label htmlFor={id} className="text-sm font-semibold">{label}</Label><div className="flex items-center gap-2"><Input id={id} type="number" inputMode="numeric" min={0} max={max} step={wholeNumber ? 1 : "any"} aria-invalid={invalid} aria-describedby={wholeNumber || invalid ? `${id}-help` : undefined} value={value} onChange={(event) => onChange(event.target.value)} className={`w-24 text-right font-bold ${invalid ? "border-rose-400 text-rose-800" : ""}`} /><span className="text-sm font-semibold text-muted-foreground">{suffix}</span></div></div>{(wholeNumber || invalid) && <p id={`${id}-help`} role={invalid ? "alert" : undefined} className={`mt-2 text-xs ${invalid ? "font-semibold text-rose-700" : "text-muted-foreground"}`}>{invalid ? `Giá trị ${value} không hợp lệ. ` : ""}{message}</p>}<Progress value={(numeric / Math.max(max, 1)) * 100} className="mt-3 h-1.5" /></div>;
 }
 
 function PronunciationChoice({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -142,21 +144,30 @@ export type UnitScore = {
   freestyleCategory: string; freestyleQuestions: string[];
 };
 
-export function isUnitScoreComplete(group: EvaluationGroup, score: UnitScore, programGroup: ProgramGroup, categories: FreestyleQuestionCategory[], editing = false) {
+export function unitScoreIssue(group: EvaluationGroup, score: UnitScore, programGroup: ProgramGroup, categories: FreestyleQuestionCategory[], editing = false): string | null {
   const validPercent = (value: string) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100;
-  if (programGroup === "baby") return validPercent(score.spellingPercent) && validPercent(score.writingPercent);
+  if (programGroup === "baby") return validPercent(score.spellingPercent) && validPercent(score.writingPercent) ? null : "Cần chấm Spelling và Writing từ 0–100%.";
   if (programGroup === "super") {
     const max = group.units.reduce((sum, unit) => sum + unit.vocabularyMax, 0);
-    return score.vocabularyCorrect.trim() !== "" && Number.isInteger(Number(score.vocabularyCorrect)) && Number(score.vocabularyCorrect) >= 0 && Number(score.vocabularyCorrect) <= max
-      && validPercent(score.communicationPercent) && ["clear", "unclear"].includes(score.pronunciation);
+    if (score.vocabularyCorrect.trim() === "" || !Number.isInteger(Number(score.vocabularyCorrect)) || Number(score.vocabularyCorrect) < 0 || Number(score.vocabularyCorrect) > max) return `Vocabulary: nhập số từ đúng từ 0 đến ${max}, không nhập %.`;
+    if (!validPercent(score.communicationPercent)) return "Communication cần điểm từ 0–100%.";
+    if (!["clear", "unclear"].includes(score.pronunciation)) return "Cần chọn Pronunciation Clear hoặc Unclear.";
+    return null;
   }
   const category = categories.find((item) => item.category === score.freestyleCategory);
   const available = category ? freestyleCategoryQuestions(category) : [];
   const questionsComplete = editing ? score.freestyleQuestions.length > 0 : available.length > 0 && score.freestyleQuestions.length === available.length && score.freestyleQuestions.every((question) => available.includes(question));
-  return validPercent(score.patternPercent) && validPercent(score.freestylePercent) && questionsComplete && isCompleteCambridgeEvaluation({
+  if (!questionsComplete) return "Cần chọn chủ đề Freestyle có câu hỏi.";
+  if (!validPercent(score.patternPercent) || !validPercent(score.freestylePercent)) return "Cần chấm điểm Pattern và Free từ 0–100%.";
+  if (!isCompleteCambridgeEvaluation({
     pattern: { pronunciation: score.patternPronunciation as CambridgePronunciation | "", oneOrMany: score.patternOneOrMany as CambridgeBinary | "", amIsAre: score.patternAmIsAre as CambridgeBinary | "" },
     free: { pronunciation: score.freePronunciation as CambridgePronunciation | "", oneOrMany: score.freeOneOrMany as CambridgeBinary | "", amIsAre: score.freeAmIsAre as CambridgeBinary | "" },
-  });
+  })) return "Cần chấm đủ Pronunciation, One / Many và Am / Is / Are.";
+  return null;
+}
+
+export function isUnitScoreComplete(group: EvaluationGroup, score: UnitScore, programGroup: ProgramGroup, categories: FreestyleQuestionCategory[], editing = false) {
+  return unitScoreIssue(group, score, programGroup, categories, editing) === null;
 }
 
 function UnitEvaluationCard({ group, programLabel, programGroup, studentName, className, score, onChange, freestyleCategories, topicOptions, editing }: {
@@ -169,7 +180,7 @@ function UnitEvaluationCard({ group, programLabel, programGroup, studentName, cl
   const questions = splitFreestyleQuestions(score.freestyleQuestions, freestyleCategories);
   return <Card className="border-0 shadow-[0_10px_30px_rgba(18,48,67,0.07)]"><CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="text-xl">Evaluation Criteria · {group.label}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{studentName} · {className}</p></div><ProgramBadge group={programGroup}>{programLabel}</ProgramBadge></div></CardHeader><CardContent className="space-y-4 p-5">
     {programGroup === "baby" && <><div className="grid gap-3 sm:grid-cols-2"><NumberScore id={`spelling-${group.unitNumbers[0]}`} label="SPELLING" value={score.spellingPercent} onChange={set("spellingPercent")} /><NumberScore id={`writing-${group.unitNumbers[0]}`} label="WRITING" value={score.writingPercent} onChange={set("writingPercent")} /></div><div className="rounded-xl border bg-rose-50/50 p-4"><p className="mb-2 text-sm font-bold">Freestyle questions · Baby Stars</p><ul className="grid gap-2 sm:grid-cols-2">{flattenFreestyleCategories(freestyleCategories).map((question) => <li key={question} className="text-sm">• {question}</li>)}</ul></div></>}
-    {programGroup === "super" && <><NumberScore id={`vocabulary-${group.unitNumbers[0]}`} label="VOCABULARY" value={score.vocabularyCorrect} onChange={set("vocabularyCorrect")} max={max || 10} suffix={`/ ${max || 10}`} /><NumberScore id={`communication-${group.unitNumbers[0]}`} label="COMMUNICATION" value={score.communicationPercent} onChange={set("communicationPercent")} /><PronunciationChoice value={score.pronunciation} onChange={set("pronunciation")} /></>}
+    {programGroup === "super" && <><NumberScore id={`vocabulary-${group.unitNumbers[0]}`} label="VOCABULARY · Số từ đúng" value={score.vocabularyCorrect} onChange={set("vocabularyCorrect")} max={max || 10} suffix={`/ ${max || 10}`} wholeNumber /><NumberScore id={`communication-${group.unitNumbers[0]}`} label="COMMUNICATION" value={score.communicationPercent} onChange={set("communicationPercent")} /><PronunciationChoice value={score.pronunciation} onChange={set("pronunciation")} /></>}
     {programGroup === "cambridge" && <><div className="rounded-lg bg-sky-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-sky-800">Communication</div><div className="overflow-hidden rounded-xl border bg-white"><div className="border-b px-4 py-3"><p className="text-sm font-bold">Freestyle questions</p><p className="mt-0.5 text-xs text-muted-foreground">Toàn bộ câu hỏi trong chủ đề đã chọn của level {programLabel}.</p></div><div className="border-b bg-slate-50/70 px-4 py-3"><Label className="mb-2">Chủ đề Freestyle</Label><Picker value={score.freestyleCategory} onChange={(value) => { const category = topicOptions.find((item) => item.category === value); onChange({ freestyleCategory: value, freestyleQuestions: category ? freestyleCategoryQuestions(category) : [] }); }} placeholder="Chọn chủ đề có câu hỏi" disabled={editing} options={topicOptions.map((category) => ({ value: category.category, label: `${category.category} · ${freestyleCategoryQuestions(category).length} câu` }))} /></div>{score.freestyleQuestions.length ? <div><p className="border-b bg-sky-50/50 px-4 py-2 text-xs font-semibold text-sky-800">Chủ đề: {score.freestyleCategory || "Kết quả đã lưu trước đây"}</p><div className="grid md:grid-cols-2"><FreestyleQuestionColumn title="YES / NO" questions={questions.yesNo} /><FreestyleQuestionColumn title="WH QUESTIONS" questions={questions.wh} className="border-t md:border-l md:border-t-0" /></div></div> : <p className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Chưa có câu hỏi Freestyle. Hãy bổ sung tại Khung chương trình trước khi kiểm tra.</p>}</div><div><div className="mb-2"><p className="text-sm font-bold">Evaluation matrix</p><p className="text-xs text-muted-foreground">Pronunciation được chấm riêng cho Pattern và Free; mỗi phần có điểm % riêng.</p></div><CambridgeEvaluationMatrix patternPronunciation={score.patternPronunciation} setPatternPronunciation={set("patternPronunciation")} freePronunciation={score.freePronunciation} setFreePronunciation={set("freePronunciation")} patternPercent={score.patternPercent} setPatternPercent={set("patternPercent")} freestylePercent={score.freestylePercent} setFreestylePercent={set("freestylePercent")} patternOneOrMany={score.patternOneOrMany} setPatternOneOrMany={set("patternOneOrMany")} freeOneOrMany={score.freeOneOrMany} setFreeOneOrMany={set("freeOneOrMany")} patternAmIsAre={score.patternAmIsAre} setPatternAmIsAre={set("patternAmIsAre")} freeAmIsAre={score.freeAmIsAre} setFreeAmIsAre={set("freeAmIsAre")} /></div></>}
   </CardContent></Card>;
 }
@@ -301,11 +312,12 @@ export function CurriculumStudentCheck({ classes, students, curriculum, freestyl
       <div className="space-y-3"><p className="px-1 text-sm text-muted-foreground">{selectedUnits.length > 1 ? `Chọn một Unit để xem nội dung và chấm điểm · ${groups.filter((group) => isUnitScoreComplete(group, scoreFor(group), program.group, freestyleTopicOptions, Boolean(editingCheck))).length}/${groups.length} mục đã hoàn tất` : "Nội dung và tiêu chí kiểm tra"}</p>{groups.map((group) => {
         const key = group.unitNumbers.join("-");
         const isOpen = selectedUnits.length === 1 ? !singleCollapsed : openGroupKey === key;
-        const done = isUnitScoreComplete(group, scoreFor(group), program.group, freestyleTopicOptions, Boolean(editingCheck));
+        const issue = unitScoreIssue(group, scoreFor(group), program.group, freestyleTopicOptions, Boolean(editingCheck));
+        const done = issue === null;
         const title = group.units.length > 1 ? `All reviews · Day ${group.units[0].unitNumber}–${group.units[group.units.length - 1].unitNumber}` : group.label;
         return <section key={key} className={`overflow-hidden rounded-2xl border shadow-[0_6px_20px_rgba(18,48,67,0.05)] ${done ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}>
           <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left sm:px-5" aria-expanded={isOpen} aria-controls={`unit-check-${key}`} onClick={() => selectedUnits.length === 1 ? setSingleCollapsed((current) => !current) : setOpenGroupKey(isOpen ? null : key)}>
-            <span className="min-w-0"><span className={`block text-base font-bold ${done ? "text-emerald-900" : "text-[#143b63]"}`}>{title}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{group.units.length > 1 ? `${group.units.length} Day · Một bảng Evaluation Criteria` : group.units[0].topic}</span></span>
+            <span className="min-w-0"><span className={`block text-base font-bold ${done ? "text-emerald-900" : "text-[#143b63]"}`}>{title}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{group.units.length > 1 ? `${group.units.length} Day · Một bảng Evaluation Criteria` : group.units[0].topic}</span>{issue ? <span className="mt-1 block text-xs text-amber-800">{issue}</span> : null}</span>
             <span className="flex shrink-0 items-center gap-2"><span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${done ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}>{done ? <><CheckCircle2 className="size-3.5" /> Đã hoàn tất</> : "Chưa hoàn tất"}</span><ChevronDown className={`size-5 text-slate-600 transition-transform ${isOpen ? "rotate-180" : ""}`} /></span>
           </button>
           <div id={`unit-check-${key}`} className={isOpen ? "space-y-5 border-t bg-white p-3 sm:p-4" : ""}>{isOpen ? <>{group.units.map((item) => <CurriculumReference key={item.unitNumber} unit={item} />)}<UnitEvaluationCard group={group} programLabel={program.label} programGroup={program.group} studentName={student.name} className={classInfo?.name || ""} score={scoreFor(group)} onChange={(patch) => updateScore(group, patch)} freestyleCategories={levelFreestyleCategories} topicOptions={freestyleTopicOptions} editing={Boolean(editingCheck)} /></> : null}</div>

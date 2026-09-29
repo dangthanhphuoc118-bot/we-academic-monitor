@@ -5,6 +5,7 @@ import { CalendarDays, ClipboardCheck, LoaderCircle, Pencil, RefreshCw } from "l
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { build12Weeks, vietnamToday } from "@/lib/weekly-history";
+import { criterionCellClass, criterionTileClass, type CriterionTone } from "@/lib/criterion-colors";
 import type { LearningCheck } from "@/lib/curriculum";
 
 type Student = { id: number; name: string; classId: number | null; level: string };
@@ -19,7 +20,7 @@ type History = {
   legacy: Legacy[];
 };
 type WeeklyRecord = { id: number; checkedAt: string; createdAt?: string; result: string; check?: LearningCheck; legacy?: Legacy };
-type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string; unitLabel?: string };
+type EvaluationCriterion = { label: string; value: string; category?: "Pattern" | "Free"; criterion?: string; unitLabel?: string; tone?: CriterionTone };
 const dateLabel = (value: string) => value.split("-").reverse().join("/");
 const selectStyle = "h-10 w-full rounded-lg border bg-white px-3 text-sm";
 const resultStyle = (result: string) => result === "Good" || result === "Tốt" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : result === "Average" || result === "Đạt" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-rose-200 bg-rose-50 text-rose-800";
@@ -31,11 +32,11 @@ function HistoryCriteria({ criteria }: { criteria: EvaluationCriterion[] }) {
   const labels = Array.from(new Set(criteria.map((item) => item.unitLabel).filter((label): label is string => Boolean(label))));
   if (labels.length) return <div className="space-y-3">{labels.map((label) => <div key={label} className="rounded-lg border bg-slate-50 p-3"><p className="mb-2 text-sm font-bold text-[#143b63]">{label}</p><HistoryCriteria criteria={criteria.filter((item) => item.unitLabel === label).map((item) => ({ ...item, unitLabel: undefined }))} /></div>)}</div>;
   if (!criteria.some((item) => item.category)) {
-    return <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{criteria.map((item) => <div key={item.label} className="flex justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>;
+    return <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{criteria.map((item) => <div key={item.label} className={`flex justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${item.tone ? criterionTileClass[item.tone] : "border-slate-100 bg-white"}`}><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>;
   }
   const shared = criteria.filter((item) => !item.category);
   const rows = ["Điểm %", "Pronunciation", "One / Many", "Am / Is / Are"];
-  return <div className="space-y-2">{shared.map((item) => <div key={item.label} className="flex justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"><span>{item.label} · dùng chung</span><strong>{item.value}</strong></div>)}<div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => <strong key={category} className="border-l px-3 py-2">{criteria.find((item) => item.category === category && item.criterion === row)?.value || "—"}</strong>)}</div>)}</div></div>;
+  return <div className="space-y-2">{shared.map((item) => <div key={item.label} className={`flex justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${item.tone ? criterionTileClass[item.tone] : "border-slate-100 bg-white"}`}><span>{item.label} · dùng chung</span><strong>{item.value}</strong></div>)}<div className="overflow-hidden rounded-lg border bg-white"><div className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] bg-slate-50 text-xs font-bold"><span className="px-3 py-2 text-muted-foreground">Tiêu chí</span><span className="border-l px-3 py-2">Pattern</span><span className="border-l px-3 py-2">Free</span></div>{rows.map((row) => <div key={row} className="grid grid-cols-[minmax(110px,1.2fr)_1fr_1fr] border-t text-sm"><span className="px-3 py-2 text-muted-foreground">{row}</span>{(["Pattern", "Free"] as const).map((category) => { const item = criteria.find((entry) => entry.category === category && entry.criterion === row); return <strong key={category} className={`border-l px-3 py-2 ${item?.tone ? criterionCellClass[item.tone] : ""}`}>{item?.value || "—"}</strong>; })}</div>)}</div></div>;
 }
 
 export function WeeklyTracking({ students, classes, revision, initialStudentId = "", onCheck, criteriaFor }: {
