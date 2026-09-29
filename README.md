@@ -10,6 +10,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Tự thêm, đổi tên, sắp xếp và tạm ẩn chương trình hoặc trình độ.
 - Phiếu đánh giá thay đổi theo chương trình của học viên.
 - Khi kiểm tra nhiều Unit, nội dung và bảng chấm được thu gọn theo từng mục; bấm vào mục để mở, mục đã chấm đủ chuyển xanh lá. Điểm vẫn được giữ khi chuyển giữa các mục.
+- Vocabulary của Super Kids nhập **số từ đúng trên tổng số từ** (ví dụ đúng 50% của 8 từ thì nhập 4/8); ô nhập báo lỗi ngay nếu vượt giới hạn.
 - Phiếu Starters/Movers/Flyers chọn một chủ đề Freestyle rồi hiển thị toàn bộ câu trong chủ đề đó theo hai cột YES/NO và WH QUESTIONS.
 - Phần chấm Cambridge có điểm % và Pronunciation Clear/Unclear riêng cho Pattern và Free; One/Many và Am/Is/Are cũng được đánh giá theo từng cột.
 - Baby Stars có sẵn 8 câu Freestyle chung cho level, hiển thị ngay trong phiếu kiểm tra và có thể chỉnh sửa ở Khung chương trình.
@@ -26,6 +27,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Tab Theo dõi 12 tuần: hiển thị tuần hiện tại và 11 tuần trước. Chính sách lưu và dọn dữ liệu 48 tuần từ bản trước vẫn giữ nguyên.
 - Không hiển thị điểm tổng dạng `/5`; giữ các tiêu chí chi tiết và nhãn Good/Average/Redflag.
 - Báo cáo học viên theo ba vùng Good, Average và Redflag, hiển thị chi tiết Evaluation Criteria, biểu đồ so sánh và lịch sử kiểm tra.
+- Từng tiêu chí Evaluation Criteria trong Báo cáo và Theo dõi 12 tuần có màu Good/Average/Redflag theo ngưỡng của chương trình; Clear/Correct màu xanh, Unclear/Incorrect màu đỏ.
 - Cập nhật lại kết quả vừa lưu hoặc kết quả cũ trên đúng bản ghi, không tạo bản trùng.
 - Quy tắc Good/Average/Redflag riêng cho Baby Stars, Super Kids và Starters/Movers/Flyers.
 - Đăng nhập bằng email và mã PIN, có ba vai trò Admin, Academic Manager và Academic Leader.
@@ -44,7 +46,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 ## Hướng dẫn nhanh
 
-**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật phiếu kiểm tra](HUONG-DAN-THU-GON-UNIT-29-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
+**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật điểm và màu báo cáo](HUONG-DAN-MAU-TIEU-CHI-29-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
 
 Toàn bộ hướng dẫn từng bước nằm trong file [HUONG-DAN-SETUP.md](HUONG-DAN-SETUP.md).
 

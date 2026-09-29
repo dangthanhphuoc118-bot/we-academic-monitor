@@ -5,8 +5,10 @@ import ts from "typescript";
 import { curriculumDefaults, PREVIOUS_LEVEL_REVIEW_UNIT_NUMBER } from "../lib/curriculum.ts";
 import React from "react";
 import { renderToString } from "react-dom/server";
-import { CurriculumManager, CurriculumStudentCheck, isUnitScoreComplete } from "../app/curriculum-check.tsx";
+import { CurriculumManager, CurriculumStudentCheck, isUnitScoreComplete, unitScoreIssue } from "../app/curriculum-check.tsx";
+import { evaluationCriteria, EvaluationCriteriaGrid } from "../app/academic-dashboard.tsx";
 import { normalizeCambridgeEvaluation } from "../lib/cambridge-evaluation.ts";
+import { choiceCriterionTone, percentCriterionTone, vocabularyCriterionTone } from "../lib/criterion-colors.ts";
 import { defaultFreestyleBanks, eligibleFreestyleCategories, flattenFreestyleCategories, freestyleCategoryQuestions, sampleFreestyleQuestionsFromCategory, sampleSpeakingQuestions, splitFreestyleQuestions } from "../lib/speaking-questions.ts";
 import { parseReviewVocabularySections, parseVocabularyGroups, vocabularyGroupLabels } from "../lib/vocabulary.ts";
 import { evaluationGroups } from "../lib/unit-evaluation.ts";
@@ -248,4 +250,63 @@ test("A Unit turns green only when all its scoring fields are complete", () => {
   assert.match(html, /border-emerald-300 bg-emerald-50[^>]*>[\s\S]*?aria-controls="unit-check-4"/);
   assert.match(html, /aria-controls="unit-check-4"[\s\S]*?Đã hoàn tất/);
   assert.match(html, /aria-controls="unit-check-5"[\s\S]*?Chưa hoàn tất/);
+});
+
+test("Vocabulary input explains why 50/8 cannot complete the Unit", () => {
+  const unit = curriculumDefaults.find((item) => item.programCode === "SUPER_KIDS_2" && item.unitNumber === 1);
+  const group = evaluationGroups([unit])[0];
+  const score = { spellingPercent: "", writingPercent: "", vocabularyCorrect: "50", communicationPercent: "60", pronunciation: "clear", patternPercent: "", freestylePercent: "", patternPronunciation: "", freePronunciation: "", patternOneOrMany: "", freeOneOrMany: "", patternAmIsAre: "", freeAmIsAre: "", freestyleCategory: "", freestyleQuestions: [] };
+  assert.equal(unit.vocabularyMax, 8);
+  assert.equal(isUnitScoreComplete(group, score, "super", []), false);
+  assert.match(unitScoreIssue(group, score, "super", []), /0 đến 8, không nhập %/);
+  const html = renderToString(React.createElement(CurriculumStudentCheck, {
+    classes: [{ id: 1, name: "Super A", level: "Super Kids 2", schedule: "", teacherName: null }],
+    students: [{ id: 1, name: "Test", classId: 1, className: "Super A", level: "Super Kids 2" }],
+    curriculum: curriculumDefaults, freestyleBanks: [], levelOptions: [], feedbackOptions: [],
+    selectedClassId: "1", setSelectedClassId: () => {}, selectedStudentId: "1", setSelectedStudentId: () => {},
+    initialUnitNumbers: [1], onSaved: () => {}, openFeedbackOptions: () => {},
+    editingCheck: { programCode: "SUPER_KIDS_2", unitNumber: 1, checkedAt: "2026-09-29", notes: "", feedbackJson: "[]", evaluationJson: JSON.stringify({ unitNumbers: [1], unitEvaluations: [{ unitNumbers: [1], vocabularyCorrect: 50, communicationPercent: 60, pronunciation: "clear" }] }) },
+  }));
+  assert.match(html, /Giá trị 50 không hợp lệ/);
+  assert.match(html, /aria-invalid="true"/);
+});
+
+test("Report criterion colors follow the existing Good, Average and Redflag thresholds", () => {
+  assert.equal(percentCriterionTone(49, 50), "redflag");
+  assert.equal(percentCriterionTone(50, 50), "average");
+  assert.equal(percentCriterionTone(80, 50), "average");
+  assert.equal(percentCriterionTone(81, 50), "good");
+  assert.equal(vocabularyCriterionTone(5, 8), "redflag");
+  assert.equal(vocabularyCriterionTone(6, 8), "average");
+  assert.equal(vocabularyCriterionTone(7, 8), "good");
+  assert.equal(percentCriterionTone(50, 60), "redflag");
+  assert.equal(percentCriterionTone(60, 60), "average");
+  assert.equal(percentCriterionTone(40, 60), "redflag");
+  assert.equal(choiceCriterionTone("clear"), "good");
+  assert.equal(choiceCriterionTone("incorrect"), "redflag");
+  assert.equal(choiceCriterionTone(""), undefined);
+});
+
+test("Report colors each saved criterion independently within Super Kids and Cambridge units", () => {
+  const superCheck = { programCode: "SUPER_KIDS_2", unitLabel: "Unit 1, Unit 2", evaluationJson: JSON.stringify({ unitEvaluations: [
+    { unitNumbers: [1], vocabularyCorrect: 7, vocabularyMax: 8, communicationPercent: 50, pronunciation: "clear" },
+    { unitNumbers: [2], vocabularyCorrect: 6, vocabularyMax: 8, communicationPercent: 80, pronunciation: "unclear" },
+  ] }) };
+  const criteria = evaluationCriteria(superCheck);
+  assert.deepEqual(criteria.filter((row) => row.unitLabel === "Unit 1").map((row) => row.tone), ["good", "redflag", "good"]);
+  assert.deepEqual(criteria.filter((row) => row.unitLabel === "Unit 2").map((row) => row.tone), ["average", "average", "redflag"]);
+  const superHtml = renderToString(React.createElement(EvaluationCriteriaGrid, { criteria }));
+  assert.match(superHtml, /border-emerald-200 bg-emerald-50[^>]*>[^<]*<span>Vocabulary<\/span><strong>7\/8<\/strong>/);
+  assert.match(superHtml, /border-rose-200 bg-rose-50[^>]*>[^<]*<span>Communication<\/span><strong>50%<\/strong>/);
+
+  const cambridge = evaluationCriteria({ programCode: "STARTERS", unitLabel: "Unit 9", evaluationJson: JSON.stringify({ patternPercent: 40, freestylePercent: 70,
+    pattern: { pronunciation: "clear", oneOrMany: "incorrect", amIsAre: "correct" },
+    free: { pronunciation: "unclear", oneOrMany: "correct", amIsAre: "correct" },
+  }) });
+  assert.equal(cambridge.find((row) => row.label === "Pattern · Điểm %").tone, "redflag");
+  assert.equal(cambridge.find((row) => row.label === "Free · Điểm %").tone, "average");
+  assert.equal(cambridge.find((row) => row.label === "Pattern · Pronunciation").tone, "good");
+  const matrixHtml = renderToString(React.createElement(EvaluationCriteriaGrid, { criteria: cambridge }));
+  assert.match(matrixHtml, /bg-rose-50 text-rose-900[^>]*>40%/);
+  assert.match(matrixHtml, /bg-amber-50 text-amber-950[^>]*>70%/);
 });
