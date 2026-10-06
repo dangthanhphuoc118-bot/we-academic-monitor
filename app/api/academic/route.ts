@@ -26,6 +26,7 @@ import {
 } from "@/lib/cambridge-evaluation";
 import { validDate } from "@/lib/weekly-history";
 import { evaluationGroups } from "@/lib/unit-evaluation";
+import { studentResult, validStudentGrading } from "@/lib/student-grading";
 import { isInStudentHistoryWindow, pruneExpiredStudentHistory } from "@/lib/history-retention";
 import {
   defaultFreestyleBanks,
@@ -120,6 +121,9 @@ export async function GET(request: Request) {
             guardianPhone: students.guardianPhone,
             status: students.status,
             note: students.note,
+            customGrading: students.customGrading,
+            redflagBelow: students.redflagBelow,
+            goodFrom: students.goodFrom,
           })
           .from(students)
           .leftJoin(classes, eq(students.classId, classes.id))
@@ -267,6 +271,7 @@ export async function GET(request: Request) {
     );
     const speakingPrograms = programs.filter((program) => program.group === "cambridge" || program.group === "baby");
 
+    const gradingByStudent = new Map(studentRows.map((student) => [student.id, student]));
     return Response.json({
       classes: classRows.map((row) => {
         const assignments = assignmentsByClass.get(row.id) || [];
@@ -288,7 +293,7 @@ export async function GET(request: Request) {
       students: studentRows,
       teachers: teacherRows.map((row) => ({ ...row, classCount: Number(row.classCount) })),
       criteria: criterionRows,
-      studentAssessments: assessmentRows,
+      studentAssessments: assessmentRows.map((row) => ({ ...row, result: studentResult(row.overallScore, row.result, gradingByStudent.get(row.studentId)) })),
       teacherReviews: reviewRows,
       teacherObservations: observationRows,
       curriculum,
@@ -304,7 +309,7 @@ export async function GET(request: Request) {
           updatedAt: stored?.updatedAt || null,
         };
       }),
-      learningChecks: learningCheckRows,
+      learningChecks: learningCheckRows.map((row) => ({ ...row, result: studentResult(row.overallScore, row.result, gradingByStudent.get(row.studentId)) })),
       levelOptions: levelRows,
       feedbackOptions: feedbackRows,
       checkQueue: queueRows,
@@ -620,7 +625,7 @@ export async function POST(request: Request) {
       }
 
       const [student] = await db
-        .select({ classId: students.classId, level: students.level })
+        .select({ classId: students.classId, level: students.level, customGrading: students.customGrading, redflagBelow: students.redflagBelow, goodFrom: students.goodFrom })
         .from(students)
         .where(eq(students.id, studentId))
         .limit(1);
@@ -746,7 +751,7 @@ export async function POST(request: Request) {
 
       if (checkId) {
         const [row] = await db.update(learningChecks).set(checkValues).where(eq(learningChecks.id, checkId)).returning();
-        return Response.json({ item: row });
+        return Response.json({ item: { ...row, result: studentResult(row.overallScore, row.result, student) } });
       }
 
       const [row] = await db
@@ -762,7 +767,7 @@ export async function POST(request: Request) {
         .set({ status: "completed", completedAt: now(), updatedAt: now() })
         .where(queueId ? and(eq(studentCheckQueue.id, queueId), eq(studentCheckQueue.studentId, studentId), eq(studentCheckQueue.status, "pending"))
           : and(eq(studentCheckQueue.studentId, studentId), eq(studentCheckQueue.scheduledDate, checkedAt), eq(studentCheckQueue.unitNumbersJson, "[]")));
-      return Response.json({ item: row }, { status: 201 });
+      return Response.json({ item: { ...row, result: studentResult(row.overallScore, row.result, student) } }, { status: 201 });
     }
 
     if (action === "deleteLearningCheck") {
@@ -832,6 +837,16 @@ export async function POST(request: Request) {
       const name = text(body.name);
       const level = text(body.level);
       if (!name || !level) return fail("Vui lòng nhập họ tên và trình độ học viên.");
+      const itemId = action === "updateStudent" ? id(body.id) : null;
+      if (action === "updateStudent" && !itemId) return fail("Học viên không hợp lệ.");
+      const [previous] = itemId ? await db.select({ customGrading: students.customGrading, redflagBelow: students.redflagBelow, goodFrom: students.goodFrom }).from(students).where(eq(students.id, itemId)).limit(1) : [undefined];
+      if (itemId && !previous) return fail("Không tìm thấy học viên.", 404);
+      const customGrading = body.customGrading === undefined ? Boolean(previous?.customGrading) : body.customGrading === true || body.customGrading === 1;
+      const redflagBelow = Number(body.redflagBelow ?? previous?.redflagBelow ?? 50);
+      const goodFrom = Number(body.goodFrom ?? previous?.goodFrom ?? 81);
+      if (customGrading && !validStudentGrading(redflagBelow, goodFrom)) {
+        return fail("Ngưỡng riêng phải là số nguyên: 0 ≤ mốc Average < mốc Good ≤ 100.");
+      }
       const values = {
         name,
         classId: id(body.classId),
@@ -839,15 +854,16 @@ export async function POST(request: Request) {
         guardianPhone: text(body.guardianPhone),
         status: text(body.status) || "active",
         note: text(body.note),
+        customGrading: customGrading ? 1 : 0,
+        redflagBelow: validStudentGrading(redflagBelow, goodFrom) ? redflagBelow : previous?.redflagBelow ?? 50,
+        goodFrom: validStudentGrading(redflagBelow, goodFrom) ? goodFrom : previous?.goodFrom ?? 81,
         updatedAt: now(),
       };
       if (action === "createStudent") {
         const [row] = await db.insert(students).values(values).returning();
         return Response.json({ item: row }, { status: 201 });
       }
-      const itemId = id(body.id);
-      if (!itemId) return fail("Học viên không hợp lệ.");
-      const [row] = await db.update(students).set(values).where(eq(students.id, itemId)).returning();
+      const [row] = await db.update(students).set(values).where(eq(students.id, itemId!)).returning();
       return Response.json({ item: row });
     }
 
@@ -969,7 +985,7 @@ export async function POST(request: Request) {
       const totalWeight = items.reduce((sum, item) => sum + (weights.get(item.criterionId) || 1), 0);
       const overallScore = Math.round((weighted / totalWeight) * 100) / 100;
       const result = overallScore >= 4 ? "Tốt" : overallScore >= 3 ? "Đạt" : overallScore >= 2 ? "Cần theo dõi" : "Cần hỗ trợ";
-      const [student] = await db.select({ classId: students.classId }).from(students).where(eq(students.id, studentId)).limit(1);
+      const [student] = await db.select({ classId: students.classId, customGrading: students.customGrading, redflagBelow: students.redflagBelow, goodFrom: students.goodFrom }).from(students).where(eq(students.id, studentId)).limit(1);
       if (!student) return fail("Không tìm thấy học viên.", 404);
       const [assessment] = await db.insert(studentAssessments).values({
         studentId,
@@ -987,7 +1003,7 @@ export async function POST(request: Request) {
         score: Math.min(5, Math.max(1, Number(item.score))),
         note: text(item.note),
       })));
-      return Response.json({ item: assessment }, { status: 201 });
+      return Response.json({ item: { ...assessment, result: studentResult(assessment.overallScore, assessment.result, student) } }, { status: 201 });
     }
 
     if (action === "deleteStudentAssessment") {

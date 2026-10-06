@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { classes, learningChecks, studentAssessments, students } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { pruneExpiredStudentHistory, studentTrackingWindow } from "@/lib/history-retention";
+import { studentResult } from "@/lib/student-grading";
 
 const fail = (error: string, status = 400) => Response.json({ error }, { status });
 const positiveId = (value: unknown) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null;
@@ -37,8 +38,8 @@ export async function GET(request: Request) {
       endDate,
       currentWeekStart,
       deletedBefore,
-      learningChecks: checks.map(({ check, className }) => ({ ...check, className, studentName: student.name })),
-      legacy: legacy.map(({ assessment, className }) => ({ ...assessment, className, studentName: student.name })),
+      learningChecks: checks.map(({ check, className }) => ({ ...check, className, studentName: student.name, result: studentResult(check.overallScore, check.result, student) })),
+      legacy: legacy.map(({ assessment, className }) => ({ ...assessment, className, studentName: student.name, result: studentResult(assessment.overallScore, assessment.result, student) })),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("Không thể tải lịch sử 12 tuần. Kiểm tra kết nối và migration mới nhất.", 500);
