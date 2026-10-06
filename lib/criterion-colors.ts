@@ -1,15 +1,19 @@
 export type CriterionTone = "good" | "average" | "redflag";
+import { validStudentGrading, type StudentGrading } from "./student-grading";
 
 // Per-criterion colors mirror the stored overall score rules: red thresholds
 // depend on the program/criterion, while Good requires strictly above 80%.
-export function percentCriterionTone(value: unknown, redBelow: number): CriterionTone | undefined {
+export function percentCriterionTone(value: unknown, redBelow: number, grading?: StudentGrading): CriterionTone | undefined {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100) return undefined;
+  if (grading?.customGrading && validStudentGrading(grading.redflagBelow, grading.goodFrom)) {
+    return value < grading.redflagBelow ? "redflag" : value >= grading.goodFrom ? "good" : "average";
+  }
   return value < redBelow ? "redflag" : value > 80 ? "good" : "average";
 }
 
-export function vocabularyCriterionTone(correct: unknown, max: unknown): CriterionTone | undefined {
+export function vocabularyCriterionTone(correct: unknown, max: unknown, grading?: StudentGrading): CriterionTone | undefined {
   if (typeof correct !== "number" || typeof max !== "number" || !Number.isInteger(correct) || !Number.isInteger(max) || max <= 0 || correct < 0 || correct > max) return undefined;
-  return percentCriterionTone(correct / max * 100, 70);
+  return percentCriterionTone(correct / max * 100, 70, grading);
 }
 
 export function choiceCriterionTone(value: unknown): CriterionTone | undefined {

@@ -78,6 +78,13 @@
       "when": 1790581962901,
       "tag": "0010_powerful_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791278272018,
+      "tag": "0011_sweet_titanium_man",
+      "breakpoints": true
     }
   ]
 }

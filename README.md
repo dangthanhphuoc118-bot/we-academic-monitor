@@ -28,6 +28,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 - Không hiển thị điểm tổng dạng `/5`; giữ các tiêu chí chi tiết và nhãn Good/Average/Redflag.
 - Báo cáo học viên theo ba vùng Good, Average và Redflag, hiển thị chi tiết Evaluation Criteria, biểu đồ so sánh và lịch sử kiểm tra.
 - Từng tiêu chí Evaluation Criteria trong Báo cáo và Theo dõi 12 tuần có màu Good/Average/Redflag theo ngưỡng của chương trình; Clear/Correct màu xanh, Unclear/Incorrect màu đỏ.
+- AL có thể đánh dấu ★ ở hồ sơ học viên và đặt mốc Average/Good riêng. Phiếu kiểm tra, báo cáo và lịch sử dùng các mốc này cho học viên đó, kể cả kết quả đã lưu; tắt dấu sao sẽ trở về phân loại cũ.
 - Cập nhật lại kết quả vừa lưu hoặc kết quả cũ trên đúng bản ghi, không tạo bản trùng.
 - Quy tắc Good/Average/Redflag riêng cho Baby Stars, Super Kids và Starters/Movers/Flyers.
 - Đăng nhập bằng email và mã PIN, có ba vai trò Admin, Academic Manager và Academic Leader.
@@ -46,7 +47,7 @@ Website nội bộ để theo dõi học viên, lớp học, giáo viên, khung 
 
 ## Hướng dẫn nhanh
 
-**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật điểm và màu báo cáo](HUONG-DAN-MAU-TIEU-CHI-29-09-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
+**Đang có website hoạt động?** Làm theo [hướng dẫn cập nhật ngưỡng riêng học viên](HUONG-DAN-NGUONG-RIENG-HOC-VIEN-06-10-2026.md), giữ nguyên `wrangler.jsonc` và D1 đang dùng.
 
 Toàn bộ hướng dẫn từng bước nằm trong file [HUONG-DAN-SETUP.md](HUONG-DAN-SETUP.md).
 
@@ -74,6 +75,7 @@ npm run deploy
 - Migration `0007_unique_polaris.sql` tạo bảng phân công nhiều giáo viên và tự chuyển giáo viên đang gắn với từng lớp; không làm mất phân công cũ.
 - Migration `0008_closed_jack_murdock.sql` tạo ngân hàng Freestyle theo level và chủ động xóa nội dung Freestyle cũ theo từng Unit của Starters, Movers và Flyers. Migration không xóa câu hỏi đã lưu trong lịch sử kết quả kiểm tra.
 - Migration `0009_yellow_bullseye.sql` và `0010_powerful_vindicator.sql` chỉ thêm cột danh sách Unit và mã chương trình vào lịch kiểm tra; các lịch và kết quả cũ vẫn được giữ nguyên.
+- Migration `0011_sweet_titanium_man.sql` chỉ thêm ba cột ngưỡng đánh giá riêng cho học viên; mặc định tất cả học viên tiếp tục phân loại theo hệ thống.
 - Việc xóa dữ liệu học viên ngoài 48 tuần không nằm trong migration. Nó chạy khi người dùng đã đăng nhập tải dashboard hoặc tab Theo dõi 12 tuần. Mốc hiển thị 12 tuần không thay đổi chính sách lưu này.
 - Trước mỗi thay đổi lớn, xuất bản sao D1 theo hướng dẫn trong `HUONG-DAN-SETUP.md`.
 
