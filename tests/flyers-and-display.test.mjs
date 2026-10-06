@@ -9,6 +9,7 @@ import { CurriculumManager, CurriculumStudentCheck, isUnitScoreComplete, unitSco
 import { evaluationCriteria, EvaluationCriteriaGrid } from "../app/academic-dashboard.tsx";
 import { normalizeCambridgeEvaluation } from "../lib/cambridge-evaluation.ts";
 import { choiceCriterionTone, percentCriterionTone, vocabularyCriterionTone } from "../lib/criterion-colors.ts";
+import { personalizedResult, studentResult, validStudentGrading } from "../lib/student-grading.ts";
 import { defaultFreestyleBanks, eligibleFreestyleCategories, flattenFreestyleCategories, freestyleCategoryQuestions, sampleFreestyleQuestionsFromCategory, sampleSpeakingQuestions, splitFreestyleQuestions } from "../lib/speaking-questions.ts";
 import { parseReviewVocabularySections, parseVocabularyGroups, vocabularyGroupLabels } from "../lib/vocabulary.ts";
 import { evaluationGroups } from "../lib/unit-evaluation.ts";
@@ -285,6 +286,22 @@ test("Report criterion colors follow the existing Good, Average and Redflag thre
   assert.equal(choiceCriterionTone("clear"), "good");
   assert.equal(choiceCriterionTone("incorrect"), "redflag");
   assert.equal(choiceCriterionTone(""), undefined);
+});
+
+test("Personal ranges replace the system grade and color boundaries for one learner", () => {
+  const grading = { customGrading: true, redflagBelow: 35, goodFrom: 65 };
+  assert.equal(validStudentGrading(35, 65), true);
+  assert.equal(validStudentGrading(65, 65), false);
+  assert.equal(validStudentGrading(-1, 50), false);
+  assert.equal(validStudentGrading(35.5, 65), false);
+  assert.equal(personalizedResult(34.99, grading), "Redflag");
+  assert.equal(studentResult(2, "Redflag", grading), "Average");
+  assert.equal(studentResult(3.25, "Redflag", grading), "Good");
+  assert.equal(studentResult(3.25, "Redflag", { ...grading, customGrading: false }), "Redflag");
+  assert.equal(percentCriterionTone(40, 60, grading), "average");
+  assert.equal(vocabularyCriterionTone(6, 10, grading), "average");
+  const check = { programCode: "SUPER_KIDS_2", unitLabel: "Unit 1", evaluationJson: JSON.stringify({ vocabularyCorrect: 6, vocabularyMax: 10, communicationPercent: 75, pronunciation: "unclear" }) };
+  assert.deepEqual(evaluationCriteria(check, grading).map((row) => row.tone), ["average", "good", "redflag"]);
 });
 
 test("Report colors each saved criterion independently within Super Kids and Cambridge units", () => {

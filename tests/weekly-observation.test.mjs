@@ -62,7 +62,7 @@ for (const [index, role] of ["admin", "academic_manager", "academic_leader"].ent
   sqlite.prepare("INSERT INTO auth_sessions(id,user_id,expires_at) VALUES(?,?,?)").run(role, index + 1, "2099-01-01T00:00:00.000Z");
 }
 const preservationQueries = [
-  ["students", "SELECT * FROM students"],
+  ["students", "SELECT id,name,class_id,level,guardian_phone,status,note,created_at,updated_at FROM students"],
   ["teachers", "SELECT * FROM teachers"],
   ["teacher_reviews", "SELECT * FROM teacher_reviews"],
   ["auth_users", "SELECT * FROM auth_users"],
@@ -104,6 +104,7 @@ const req = (path, role = "academic_leader", body) => new Request(`https://test.
 
 test("Additive migrations preserve existing learners, reviews, auth and curriculum overrides", () => {
   for (const [table, query, snapshot] of beforeMigration) assert.equal(JSON.stringify(sqlite.prepare(query).all()), snapshot, table);
+  assert.deepEqual({ ...sqlite.prepare("SELECT custom_grading,redflag_below,good_from FROM students WHERE id=1").get() }, { custom_grading: 0, redflag_below: 50, good_from: 81 });
   assert.equal(JSON.stringify(sqlite.prepare("SELECT class_id AS classId, teacher_id AS teacherId FROM class_teachers").all()), JSON.stringify([{ classId: 1, teacherId: 1 }]));
   assert.equal(sqlite.prepare("SELECT freestyle_questions AS questions FROM curriculum_overrides WHERE program_code='FLYERS' AND unit_number=1").get().questions, "[]");
 });
@@ -352,4 +353,57 @@ test("Observation snapshot remains readable and editable when teacher/class are 
   assert.equal(saved.status, 200, await saved.clone().text());
   assert.equal((await observations.POST(req("/api/observations", "admin", { action: "delete", id: row.id }))).status, 200);
   assert.equal((await observations.POST(req("/api/observations", "admin", { action: "delete", id: row.id }))).status, 404);
+});
+
+test("AL sets a learner's own grading ranges; reports and history update without changing saved scores", async () => {
+  const created = await academic.POST(req("/api/academic", "academic_leader", {
+    action: "createStudent", name: "Learner with own ranges", level: "Super Kids 2",
+    customGrading: true, redflagBelow: 40, goodFrom: 70,
+  }));
+  assert.equal(created.status, 201, await created.clone().text());
+  const { item: student } = await created.json();
+  assert.equal(student.customGrading, 1);
+  const savedCheck = await academic.POST(req("/api/academic", "academic_leader", {
+    action: "createLearningCheck", studentId: student.id, programCode: "SUPER_KIDS_2",
+    unitNumber: 1, unitNumbers: [1], checkedAt: vietnamToday(), feedback: [],
+    evaluation: { unitEvaluations: [{ unitNumbers: [1], vocabularyCorrect: 4, communicationPercent: 90, pronunciation: "clear" }] },
+  }));
+  assert.equal(savedCheck.status, 201, await savedCheck.clone().text());
+  assert.equal((await savedCheck.json()).item.result, "Good");
+  sqlite.prepare("INSERT INTO student_assessments(student_id,evaluator_name,overall_score,result,checked_at) VALUES(?,'AL',3.5,'Đạt',?)")
+    .run(student.id, vietnamToday());
+  const getResults = async () => {
+    const dashboard = await (await academic.GET(req("/api/academic"))).json();
+    const historyRows = await (await history.GET(req(`/api/student-history?studentId=${student.id}`))).json();
+    return {
+      learner: dashboard.students.find((row) => row.id === student.id),
+      check: dashboard.learningChecks.find((row) => row.studentId === student.id),
+      old: dashboard.studentAssessments.find((row) => row.studentId === student.id),
+      historyCheck: historyRows.learningChecks.find((row) => row.studentId === student.id),
+      historyOld: historyRows.legacy.find((row) => row.studentId === student.id),
+    };
+  };
+  let rows = await getResults();
+  assert.equal(rows.check.result, "Good");
+  assert.equal(rows.old.result, "Good");
+  assert.equal(rows.historyCheck.result, "Good");
+  assert.equal(rows.historyOld.result, "Good");
+  assert.equal(rows.check.overallScore, 3.5);
+  assert.equal(sqlite.prepare("SELECT result FROM learning_checks WHERE student_id=?").get(student.id).result, "Redflag");
+
+  const invalid = await academic.POST(req("/api/academic", "academic_leader", { action: "updateStudent", id: student.id, name: student.name, level: student.level, customGrading: true, redflagBelow: 80, goodFrom: 80 }));
+  assert.equal(invalid.status, 400);
+  const changed = await academic.POST(req("/api/academic", "academic_leader", { action: "updateStudent", id: student.id, name: student.name, level: student.level, customGrading: true, redflagBelow: 40, goodFrom: 80 }));
+  assert.equal(changed.status, 200, await changed.clone().text());
+  rows = await getResults();
+  assert.equal(rows.check.result, "Average");
+  assert.equal(rows.historyOld.result, "Average");
+  const disabled = await academic.POST(req("/api/academic", "academic_leader", { action: "updateStudent", id: student.id, name: student.name, level: student.level, customGrading: false }));
+  assert.equal(disabled.status, 200, await disabled.clone().text());
+  rows = await getResults();
+  assert.equal(rows.learner.customGrading, 0);
+  assert.equal(rows.learner.redflagBelow, 40);
+  assert.equal(rows.learner.goodFrom, 80);
+  assert.equal(rows.check.result, "Redflag");
+  assert.equal(rows.old.result, "Đạt");
 });
